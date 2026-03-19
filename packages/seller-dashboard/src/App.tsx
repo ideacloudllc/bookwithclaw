@@ -20,9 +20,9 @@ function App() {
           path="/login" 
           element={isAuthenticated ? <Navigate to="/portal" replace /> : <Login />} 
         />
-        {/* Protected dashboard */}
+        {/* Protected dashboard with nested routes */}
         <Route
-          path="/portal"
+          path="/portal/*"
           element={
             <ProtectedRoute>
               <Dashboard />

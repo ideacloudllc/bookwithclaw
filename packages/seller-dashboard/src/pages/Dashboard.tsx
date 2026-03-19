@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { DashboardTab } from '../components/DashboardTab';
 import { InventoryTab } from '../components/InventoryTab';
@@ -18,31 +18,21 @@ const tabs = [
 ];
 
 export const Dashboard = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pathSegments = location.pathname.split('/');
+  const currentTab = pathSegments[pathSegments.length - 1] || 'dashboard';
+  const [activeTab, setActiveTab] = useState(currentTab);
 
-  // Update URL when tab changes
+  // Sync activeTab with URL when location changes
   useEffect(() => {
-    setSearchParams({ tab: activeTab });
-  }, [activeTab, setSearchParams]);
+    const newTab = pathSegments[pathSegments.length - 1] || 'dashboard';
+    setActiveTab(newTab);
+  }, [location.pathname]);
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <DashboardTab onNavigate={setActiveTab} />;
-      case 'inventory':
-        return <InventoryTab />;
-      case 'offers':
-        return <OffersTab />;
-      case 'bookings':
-        return <BookingsTab />;
-      case 'pricing':
-        return <PricingTab />;
-      case 'profile':
-        return <ProfileTab />;
-      default:
-        return <DashboardTab onNavigate={setActiveTab} />;
-    }
+  // Navigate when tab changes
+  const handleTabChange = (tabId: string) => {
+    navigate(`/portal/${tabId}`, { replace: false });
   };
 
   const getTabTitle = () => {
@@ -54,10 +44,18 @@ export const Dashboard = () => {
     <Layout
       tabs={tabs}
       activeTab={activeTab}
-      onTabChange={setActiveTab}
+      onTabChange={handleTabChange}
       title={getTabTitle()}
     >
-      {renderContent()}
+      <Routes>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardTab onNavigate={handleTabChange} />} />
+        <Route path="inventory" element={<InventoryTab />} />
+        <Route path="offers" element={<OffersTab />} />
+        <Route path="bookings" element={<BookingsTab />} />
+        <Route path="pricing" element={<PricingTab />} />
+        <Route path="profile" element={<ProfileTab />} />
+      </Routes>
     </Layout>
   );
 };

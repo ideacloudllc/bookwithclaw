@@ -92,19 +92,25 @@ export const OffersTab = () => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Check-in</p>
-                      <p className="font-bold">{new Date(offer.dates.check_in).toLocaleDateString()}</p>
+                      <p className="font-bold">
+                        {(offer as any).checkin ? new Date((offer as any).checkin).toLocaleDateString() : 
+                         (offer as any).dates?.check_in ? new Date((offer as any).dates.check_in).toLocaleDateString() : '-'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600">Check-out</p>
-                      <p className="font-bold">{new Date(offer.dates.check_out).toLocaleDateString()}</p>
+                      <p className="font-bold">
+                        {(offer as any).checkout ? new Date((offer as any).checkout).toLocaleDateString() : 
+                         (offer as any).dates?.check_out ? new Date((offer as any).dates.check_out).toLocaleDateString() : '-'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-gray-600">Guests</p>
-                      <p className="font-bold">{offer.occupancy}</p>
+                      <p className="font-bold">{(offer as any).occupancy || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-600">Budget</p>
-                      <p className="font-bold text-green-600">${offer.guest_budget}</p>
+                      <p className="text-gray-600">Offered Price</p>
+                      <p className="font-bold text-green-600">${(offer as any).offered_price || (offer as any).guest_budget || 0}</p>
                     </div>
                   </div>
                 </div>
