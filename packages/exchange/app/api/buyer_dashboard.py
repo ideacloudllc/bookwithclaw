@@ -103,8 +103,8 @@ async def login_buyer(
 
 @router.get("/search")
 async def search_rooms(
-    checkin: str,
-    checkout: str,
+    checkin: str = "2026-03-25",
+    checkout: str = "2026-03-27",
     location: Optional[str] = None,
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,

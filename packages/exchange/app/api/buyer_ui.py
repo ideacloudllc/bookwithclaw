@@ -300,9 +300,9 @@ BUYER_SEARCH_HTML = """<!DOCTYPE html>
         }
         
         async function searchRooms() {
-            const checkin = document.getElementById('checkin').value;
-            const checkout = document.getElementById('checkout').value;
-            const location = document.getElementById('location').value;
+            const checkin = document.getElementById('checkin').value || '2026-03-25';
+            const checkout = document.getElementById('checkout').value || '2026-03-27';
+            const location = document.getElementById('location').value || 'San Francisco';
             
             try {
                 const res = await fetch(\`/buyers/search?checkin=\${checkin}&checkout=\${checkout}&location=\${location}\`);
