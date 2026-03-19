@@ -405,7 +405,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         
         // Switch tabs
-        async function switchTab(clickedElement, tab) {
+        function switchTab(clickedElement, tab) {
             // Update nav links
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             clickedElement.classList.add('active');
@@ -423,12 +423,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(tab).classList.add('active');
+            const tabElement = document.getElementById(tab);
+            if (tabElement) {
+                tabElement.classList.add('active');
+            }
             
-            // Load tab data
-            if (tab === 'rooms') await loadRooms();
-            else if (tab === 'offers') await loadOffers();
-            else if (tab === 'bookings') await loadBookings();
+            // Load tab data (async but don't wait)
+            if (tab === 'rooms') loadRooms();
+            else if (tab === 'offers') loadOffers();
+            else if (tab === 'bookings') loadBookings();
         }
         
         // Load rooms
