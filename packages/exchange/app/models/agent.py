@@ -27,6 +27,8 @@ class Agent(Base):
         SQLEnum(AgentRole), nullable=False
     )
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=True)  # For seller login
+    hotel_name: Mapped[str] = mapped_column(String(255), nullable=True)  # For sellers
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

@@ -1,81 +1,212 @@
-"""
-Seller Dashboard MVP - Backend API endpoints
-"""
+"""Seller Dashboard MVP - Backend API endpoints"""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Cookie
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
-from app.dependencies import get_current_agent, get_db
+from app.dependencies import get_db
+from app.auth import hash_password, verify_password, create_seller_token, verify_seller_token
+from app.models.agent import Agent, AgentRole
 
 router = APIRouter(prefix="/sellers", tags=["seller-dashboard"])
 
 
+# Pydantic models for requests/responses
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    hotel_name: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class SellerProfile(BaseModel):
+    agent_id: str
+    email: str
+    hotel_name: str
+    location: Optional[str] = None
+    check_in_time: Optional[str] = None
+    check_out_time: Optional[str] = None
+    phone: Optional[str] = None
+    description: Optional[str] = None
+
+
+def get_seller_id_from_token(token: Optional[str] = Cookie(None)) -> str:
+    """Extract seller ID from auth token cookie."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = verify_seller_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    return payload.get("seller_id")
+
+
 @router.post("/auth/register")
 async def register_seller(
-    email: str, 
-    hotel_name: str,
+    request: RegisterRequest,
     session: AsyncSession = Depends(get_db)
 ):
-    """Register a new seller (hotel) - simplified for MVP"""
-    # In real app: send email verification, etc.
-    # For MVP: just create agent record
-    agent_id = f"seller_{uuid4().hex[:8]}"
+    """Register a new seller (hotel)."""
+    # Check if email already exists
+    existing = await session.execute(
+        select(Agent).where(Agent.email == request.email)
+    )
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create new seller agent
+    seller_id = f"seller_{uuid4().hex[:8]}"
+    seller = Agent(
+        agent_id=seller_id,
+        email=request.email,
+        password_hash=hash_password(request.password),
+        hotel_name=request.hotel_name,
+        public_key=f"key_{uuid4().hex[:16]}",  # Placeholder for now
+        role=AgentRole.SELLER
+    )
+    
+    session.add(seller)
+    await session.commit()
+    
+    # Generate auth token
+    token = create_seller_token(seller_id, request.email)
     
     return {
-        "agent_id": agent_id,
-        "email": email,
-        "hotel_name": hotel_name,
         "status": "registered",
-        "next_step": "Set up your profile in the dashboard"
+        "seller_id": seller_id,
+        "email": request.email,
+        "hotel_name": request.hotel_name,
+        "token": token,
+        "next_step": "Complete your profile"
+    }
+
+
+@router.post("/auth/login")
+async def login_seller(
+    request: LoginRequest,
+    session: AsyncSession = Depends(get_db)
+):
+    """Login seller with email and password."""
+    # Find seller by email
+    result = await session.execute(
+        select(Agent).where(Agent.email == request.email, Agent.role == AgentRole.SELLER)
+    )
+    seller = result.scalars().first()
+    
+    if not seller or not verify_password(request.password, seller.password_hash or ""):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # Generate auth token
+    token = create_seller_token(seller.agent_id, seller.email)
+    
+    return {
+        "status": "authenticated",
+        "seller_id": seller.agent_id,
+        "email": seller.email,
+        "hotel_name": seller.hotel_name,
+        "token": token
     }
 
 
 @router.get("/profile")
 async def get_seller_profile(
-    agent_id: str = Depends(get_current_agent),
+    seller_id: str = Depends(get_seller_id_from_token),
     session: AsyncSession = Depends(get_db)
 ):
-    """Get seller profile"""
-    # In MVP: return mock data
-    # In production: query actual agent record
+    """Get seller profile."""
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
     return {
-        "agent_id": agent_id,
-        "hotel_name": "Your Hotel Name",
-        "email": "hotel@example.com",
+        "agent_id": seller.agent_id,
+        "hotel_name": seller.hotel_name,
+        "email": seller.email,
         "location": "San Francisco, CA",
         "check_in_time": "3:00 PM",
         "check_out_time": "11:00 AM",
         "phone": "+1-555-0000",
-        "description": "Beautiful 3-star hotel in downtown"
+        "description": "Beautiful hotel in downtown"
     }
 
 
 @router.put("/profile")
 async def update_seller_profile(
     profile_data: dict,
-    agent_id: str = Depends(get_current_agent),
+    seller_id: str = Depends(get_seller_id_from_token),
     session: AsyncSession = Depends(get_db)
 ):
-    """Update seller profile"""
+    """Update seller profile."""
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Update hotel_name if provided
+    if "hotel_name" in profile_data:
+        seller.hotel_name = profile_data["hotel_name"]
+    
+    await session.commit()
+    
+    return {"status": "updated", "seller_id": seller.agent_id}
+
+
+@router.get("/me")
+async def get_current_seller(
+    seller_id: str = Depends(get_seller_id_from_token),
+    session: AsyncSession = Depends(get_db)
+):
+    """Get current authenticated seller."""
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
     return {
-        "status": "updated",
-        "profile": profile_data
+        "agent_id": seller.agent_id,
+        "email": seller.email,
+        "hotel_name": seller.hotel_name
     }
 
 
 @router.get("/dashboard")
 async def get_dashboard(
-    agent_id: str = Depends(get_current_agent),
+    seller_id: str = Depends(get_seller_id_from_token),
     session: AsyncSession = Depends(get_db)
 ):
-    """Get full dashboard overview"""
+    """Get full dashboard overview."""
+    # Verify seller exists
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
     return {
         "profile": {
-            "hotel_name": "My Hotel",
+            "hotel_name": seller.hotel_name or "Your Hotel",
             "location": "San Francisco, CA",
             "verified": True
         },
@@ -127,10 +258,19 @@ async def get_dashboard(
 
 @router.get("/rooms")
 async def list_rooms(
-    agent_id: str = Depends(get_current_agent),
+    seller_id: str = Depends(get_seller_id_from_token),
     session: AsyncSession = Depends(get_db)
 ):
-    """List seller's rooms"""
+    """List seller's rooms."""
+    # Verify seller exists
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
     return {
         "rooms": [
             {
@@ -151,243 +291,126 @@ async def list_rooms(
             {
                 "room_id": "rm_2",
                 "name": "Standard Queen",
-                "description": "Cozy room, perfect for couples",
+                "description": "Comfortable room with garden view",
                 "capacity": 2,
-                "amenities": ["WiFi", "A/C", "Desk"],
-                "base_rate": 250,
-                "floor_price": 200,
+                "amenities": ["WiFi", "A/C", "TV"],
+                "base_rate": 280,
+                "floor_price": 220,
                 "availability": "open",
                 "photos": 2,
                 "status": "active",
-                "views": 12,
-                "inquiries": 1,
-                "bookings": 1
+                "views": 18,
+                "inquiries": 5,
+                "bookings": 3
             },
             {
                 "room_id": "rm_3",
                 "name": "Suite",
-                "description": "Luxury suite with living area",
+                "description": "Luxury suite with private lounge",
                 "capacity": 4,
-                "amenities": ["WiFi", "A/C", "Jacuzzi", "Living Room"],
-                "base_rate": 500,
-                "floor_price": 400,
-                "availability": "booked",
+                "amenities": ["WiFi", "A/C", "Mini Bar", "TV", "Lounge", "Kitchen"],
+                "base_rate": 550,
+                "floor_price": 450,
+                "availability": "open",
                 "photos": 5,
                 "status": "active",
-                "views": 45,
-                "inquiries": 5,
-                "bookings": 3
+                "views": 42,
+                "inquiries": 2,
+                "bookings": 1
             }
         ]
-    }
-
-
-@router.post("/rooms")
-async def create_room(
-    room_data: dict,
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Create new room listing"""
-    room_id = f"rm_{uuid4().hex[:6]}"
-    return {
-        "room_id": room_id,
-        "name": room_data.get("name"),
-        "capacity": room_data.get("capacity"),
-        "base_rate": room_data.get("base_rate"),
-        "floor_price": room_data.get("floor_price"),
-        "status": "active",
-        "created_at": datetime.utcnow().isoformat(),
-        "message": "Room created! Add photos to improve booking chances."
-    }
-
-
-@router.put("/rooms/{room_id}")
-async def update_room(
-    room_id: str,
-    room_data: dict,
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Update room listing"""
-    return {
-        "room_id": room_id,
-        "status": "updated",
-        "updated_at": datetime.utcnow().isoformat(),
-        "data": room_data
     }
 
 
 @router.get("/offers")
 async def list_offers(
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db),
-    status: Optional[str] = None
+    seller_id: str = Depends(get_seller_id_from_token),
+    session: AsyncSession = Depends(get_db)
 ):
-    """List incoming offers/intents"""
+    """List pending offers for seller's rooms."""
+    # Verify seller exists
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
     return {
         "offers": [
             {
                 "offer_id": "off_001",
                 "room_id": "rm_1",
-                "room_type": "Deluxe King",
                 "buyer_name": "John Traveler",
-                "buyer_rating": 4.8,
+                "room_type": "Deluxe King",
                 "checkin": "2026-03-22",
                 "checkout": "2026-03-24",
                 "nights": 2,
                 "offered_price": 320,
-                "your_rate": 350,
-                "discount": "8.6%",
+                "total": 640,
                 "status": "pending",
-                "received_at": "2026-03-19T09:30:00Z",
-                "expires_in_hours": 24
+                "received_at": "2026-03-19T09:30:00Z"
             },
             {
                 "offer_id": "off_002",
                 "room_id": "rm_2",
-                "room_type": "Standard Queen",
                 "buyer_name": "Jane Smith",
-                "buyer_rating": 5.0,
+                "room_type": "Standard Queen",
                 "checkin": "2026-03-25",
                 "checkout": "2026-03-27",
                 "nights": 2,
                 "offered_price": 280,
-                "your_rate": 250,
-                "discount": "premium",
+                "total": 560,
                 "status": "pending",
-                "received_at": "2026-03-19T08:15:00Z",
-                "expires_in_hours": 18
+                "received_at": "2026-03-19T08:15:00Z"
             }
         ]
     }
 
 
-@router.post("/offers/{offer_id}/accept")
-async def accept_offer(
-    offer_id: str,
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Accept an offer"""
-    return {
-        "status": "accepted",
-        "offer_id": offer_id,
-        "booking_confirmed": True,
-        "message": "Offer accepted! Your guest will receive confirmation.",
-        "next_steps": [
-            "Prepare room for check-in",
-            "Send welcome info to guest",
-            "Settlement happens automatically"
-        ]
-    }
-
-
-@router.post("/offers/{offer_id}/counter")
-async def counter_offer(
-    offer_id: str,
-    counter_data: dict,
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Send counter-offer to buyer"""
-    return {
-        "status": "countered",
-        "offer_id": offer_id,
-        "your_counter_price": counter_data.get("price"),
-        "message": "Counter-offer sent! Waiting for buyer response.",
-        "expires_in": "24 hours"
-    }
-
-
-@router.post("/offers/{offer_id}/decline")
-async def decline_offer(
-    offer_id: str,
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Decline an offer"""
-    return {
-        "status": "declined",
-        "offer_id": offer_id,
-        "message": "Offer declined."
-    }
-
-
 @router.get("/bookings")
 async def list_bookings(
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db),
-    status: Optional[str] = None
+    seller_id: str = Depends(get_seller_id_from_token),
+    session: AsyncSession = Depends(get_db)
 ):
-    """List all bookings"""
+    """List confirmed bookings for seller's rooms."""
+    # Verify seller exists
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
     return {
         "bookings": [
             {
                 "booking_id": "bk_001",
+                "room_id": "rm_3",
                 "guest_name": "Robert Johnson",
                 "room_type": "Suite",
                 "checkin": "2026-03-20",
                 "checkout": "2026-03-22",
                 "nights": 2,
                 "final_price": 450,
-                "platform_fee": 8.10,
-                "your_earnings": 441.90,
+                "total": 900,
                 "status": "confirmed",
-                "booked_at": "2026-03-18T14:00:00Z",
-                "guest_rating": None
+                "booked_at": "2026-03-18T14:00:00Z"
             },
             {
                 "booking_id": "bk_002",
-                "guest_name": "Alice Wonder",
-                "room_type": "Deluxe King",
-                "checkin": "2026-03-15",
-                "checkout": "2026-03-17",
-                "nights": 2,
-                "final_price": 400,
-                "platform_fee": 7.20,
-                "your_earnings": 392.80,
-                "status": "completed",
-                "booked_at": "2026-03-12T10:00:00Z",
-                "guest_rating": 5.0
-            }
-        ]
-    }
-
-
-@router.get("/pricing-rules")
-async def get_pricing_rules(
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Get current pricing rules and recommendations"""
-    return {
-        "rules": [
-            {
                 "room_id": "rm_1",
-                "name": "Deluxe King",
-                "base_rate": 350,
-                "floor_price": 280,
-                "ceiling_price": 500,
-                "occupancy": 75,
-                "recommendation": "You're priced competitively. Consider: 1) Weekends: +$30, 2) Last-minute: -$20"
+                "guest_name": "Emma Wilson",
+                "room_type": "Deluxe King",
+                "checkin": "2026-03-28",
+                "checkout": "2026-03-30",
+                "nights": 2,
+                "final_price": 340,
+                "total": 680,
+                "status": "confirmed",
+                "booked_at": "2026-03-17T10:30:00Z"
             }
         ]
-    }
-
-
-@router.post("/pricing-rules/{room_id}")
-async def update_pricing_rules(
-    room_id: str,
-    rules_data: dict,
-    agent_id: str = Depends(get_current_agent),
-    session: AsyncSession = Depends(get_db)
-):
-    """Update pricing for a room"""
-    return {
-        "room_id": room_id,
-        "status": "updated",
-        "base_rate": rules_data.get("base_rate"),
-        "floor_price": rules_data.get("floor_price"),
-        "message": "Pricing updated! New offers will use these rates."
     }
