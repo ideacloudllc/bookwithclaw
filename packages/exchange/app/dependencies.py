@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.signing import verify_jwt_token
+from app import database
 
 security = HTTPBearer()
 
@@ -38,3 +39,9 @@ async def get_current_agent(
         )
     
     return payload
+
+
+async def get_db():
+    """Get database session from database module."""
+    async with database.SessionLocal() as session:
+        yield session
