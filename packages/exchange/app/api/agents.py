@@ -6,18 +6,16 @@ According to BUILDSPEC Step 2:
 - get_current_agent dependency extracts & validates JWT from Authorization header
 """
 
-from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.core.jwt import create_agent_token, verify_agent_token
 from app.core.signing import verify_signature
 from app.dependencies import get_db
 from app.models.agent import Agent, AgentRole
@@ -40,51 +38,8 @@ class AgentRegisterResponse(BaseModel):
     expires_in: int = Field(default=86400, description="Seconds until token expires")
 
 
-def create_agent_token(agent_id: str, role: str, public_key: str, expires_in: int = 86400) -> str:
-    """
-    Create JWT token for an agent.
-    
-    Payload: { agent_id, role, public_key, iat, exp: 24h }
-    """
-    now = datetime.utcnow()
-    expires = now + timedelta(seconds=expires_in)
-    
-    payload = {
-        "agent_id": agent_id,
-        "role": role,
-        "public_key": public_key,
-        "iat": now.timestamp(),
-        "exp": expires.timestamp(),
-    }
-    
-    token = jwt.encode(
-        payload,
-        settings.exchange_secret_key,
-        algorithm="HS256"
-    )
-    return token
-
-
-def verify_agent_token(token: str) -> dict:
-    """
-    Verify JWT token and extract payload.
-    
-    Raises:
-        ValueError if token is invalid or expired
-    """
-    try:
-        payload = jwt.decode(
-            token,
-            settings.exchange_secret_key,
-            algorithms=["HS256"]
-        )
-        return payload
-    except JWTError as e:
-        raise ValueError(f"Invalid token: {e}")
-
-
 async def get_current_agent(
-    credentials: HTTPAuthCredentials,
+    credentials: HTTPAuthorizationCredentials,
     db: AsyncSession = Depends(get_db)
 ) -> Agent:
     """

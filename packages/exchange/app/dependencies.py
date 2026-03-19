@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import database
-from app.api.agents import verify_agent_token
+from app.core.jwt import verify_agent_token
 
 security = HTTPBearer()
 
