@@ -670,7 +670,7 @@ BUYER_LANDING_HTML = """<!DOCTYPE html>
                 if (response.ok) {
                     const data = await response.json();
                     document.cookie = `token=${data.token}; path=/; max-age=2592000`;
-                    window.location.href = '/api/buyers/search';
+                    window.location.href = '/buyers/search';
                 } else {
                     const error = await response.json();
                     showError(error.detail || 'Signup failed');
@@ -752,7 +752,7 @@ BUYER_LOGIN_HTML = """<!DOCTYPE html>
                 if (response.ok) {
                     const data = await response.json();
                     document.cookie = `token=${data.token}; path=/; max-age=2592000`;
-                    window.location.href = '/api/buyers/search';
+                    window.location.href = '/buyers/search';
                 } else {
                     const error = await response.json();
                     showError(error.detail || 'Login failed');
@@ -906,7 +906,7 @@ BUYER_SEARCH_HTML = """<!DOCTYPE html>
                 const location = document.getElementById('location').value;
                 const maxprice = document.getElementById('maxprice').value;
                 
-                let url = `/buyers/search?checkin=${checkin}&checkout=${checkout}`;
+                let url = `/api/buyers/search?checkin=${checkin}&checkout=${checkout}`;
                 if (location) url += '&location=' + encodeURIComponent(location);
                 if (maxprice) url += '&max_price=' + maxprice;
                 
@@ -952,15 +952,15 @@ BUYER_SEARCH_HTML = """<!DOCTYPE html>
         }
         
         function viewRoom(roomId) {
-            window.location.href = '/api/buyers/rooms/' + roomId;
+            window.location.href = '/buyers/rooms/' + roomId;
         }
         
         function goToOffers() {
-            window.location.href = '/api/buyers/my-offers';
+            window.location.href = '/buyers/my-offers';
         }
         
         function goToBookings() {
-            window.location.href = '/api/buyers/my-bookings';
+            window.location.href = '/buyers/my-bookings';
         }
         
         function logout() {
@@ -1129,7 +1129,7 @@ BUYER_ROOM_DETAIL_HTML = """<!DOCTYPE html>
             
             const roomId = window.location.pathname.split('/').pop();
             try {
-                const res = await fetch(`/buyers/rooms/${roomId}`, {
+                const res = await fetch(`/api/buyers/rooms/${roomId}`, {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 roomData = await res.json();
@@ -1201,7 +1201,7 @@ BUYER_ROOM_DETAIL_HTML = """<!DOCTYPE html>
                 
                 if (res.ok) {
                     alert('Offer submitted! View progress in My Offers.');
-                    window.location.href = '/api/buyers/my-offers';
+                    window.location.href = '/buyers/my-offers';
                 } else {
                     alert('Error submitting offer');
                 }
@@ -1394,11 +1394,11 @@ BUYER_OFFERS_HTML = """<!DOCTYPE html>
         }
         
         function goToSearch() {
-            window.location.href = '/api/buyers/search';
+            window.location.href = '/buyers/search';
         }
         
         function goToBookings() {
-            window.location.href = '/api/buyers/my-bookings';
+            window.location.href = '/buyers/my-bookings';
         }
         
         function logout() {
@@ -1551,11 +1551,11 @@ BUYER_BOOKINGS_HTML = """<!DOCTYPE html>
         }
         
         function goToSearch() {
-            window.location.href = '/api/buyers/search';
+            window.location.href = '/buyers/search';
         }
         
         function goToOffers() {
-            window.location.href = '/api/buyers/my-offers';
+            window.location.href = '/buyers/my-offers';
         }
         
         function logout() {
