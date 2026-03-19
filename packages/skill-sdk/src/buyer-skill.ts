@@ -160,31 +160,46 @@ export class BuyerSkill {
     // Simple evaluation: if price is acceptable, accept
     // In real implementation, would do more sophisticated logic
 
-    const sessionId = ask.payload.session_id;
-    const askPrice = ask.payload.price;
+    try {
+      if (!ask || !ask.payload) {
+        console.error("Invalid ask message: missing payload");
+        return;
+      }
 
-    if (askPrice <= this.config.maxRounds * 100) {
-      // Accept if price is reasonable
-      const acceptMsg: DealAccepted = {
-        type: "DealAccepted",
-        round_num: this.currentRound + 1,
-        timestamp: new Date().toISOString(),
-        signature: "",
-        payload: {
-          session_id: sessionId,
-          agent_id: this.config.agentId,
-          agreed_price: askPrice,
-        },
-      };
+      const askPayload = ask.payload as Record<string, any>;
+      const sessionId = askPayload.session_id as string;
+      const askPrice = askPayload.price as number;
 
-      // Sign before sending
-      const payload = canonicalJSON(acceptMsg.payload);
-      acceptMsg.signature = await signMessage(
-        Buffer.from(payload),
-        this.config.privateKey
-      );
+      if (!sessionId || !askPrice) {
+        console.error("Invalid ask message: missing required fields");
+        return;
+      }
 
-      await this.sendMessage(acceptMsg);
+      if (askPrice <= this.config.maxRounds * 100) {
+        // Accept if price is reasonable
+        const acceptMsg: DealAccepted = {
+          type: "DealAccepted",
+          round_num: this.currentRound + 1,
+          timestamp: new Date().toISOString(),
+          signature: "",
+          payload: {
+            session_id: sessionId,
+            agent_id: this.config.agentId,
+            agreed_price: askPrice,
+          },
+        };
+
+        // Sign before sending
+        const payloadJson = canonicalJSON(acceptMsg.payload);
+        acceptMsg.signature = await signMessage(
+          Buffer.from(payloadJson),
+          this.config.privateKey
+        );
+
+        await this.sendMessage(acceptMsg);
+      }
+    } catch (error) {
+      console.error("Error evaluating ask:", error);
     }
   }
 

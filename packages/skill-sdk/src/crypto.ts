@@ -2,7 +2,7 @@
  * Ed25519 cryptographic utilities for BookWithClaw skills.
  */
 
-import { ed25519 } from "@noble/ed25519";
+import * as ed25519 from "@noble/ed25519";
 import { randomBytes } from "crypto";
 
 /**
