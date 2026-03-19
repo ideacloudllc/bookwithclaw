@@ -1,684 +1,491 @@
 """
-Seller Dashboard UI - Serves the frontend HTML
+Seller Dashboard UI - Serve the frontend HTML and login
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-router = APIRouter(tags=["dashboard-ui"])
+router = APIRouter(prefix="/sellers", tags=["dashboard-ui"])
 
-DASHBOARD_HTML = """
-<!DOCTYPE html>
+LOGIN_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookWithClaw Seller Dashboard</title>
+    <title>BookWithClaw - Seller Login</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-container { background: white; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 100%; max-width: 400px; padding: 40px; }
+        .logo { font-size: 28px; font-weight: 700; color: #667eea; margin-bottom: 30px; text-align: center; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; color: #333; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        button { width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        button:hover { background: #5568d3; }
+        .register-link { text-align: center; margin-top: 20px; font-size: 14px; }
+        .register-link a { color: #667eea; text-decoration: none; }
+        .error { color: #e74c3c; font-size: 14px; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">📍 BookWithClaw</div>
+        <h2 style="margin-bottom: 10px; color: #333;">Seller Dashboard</h2>
+        <p style="color: #666; margin-bottom: 30px; font-size: 14px;">Manage your rooms and bookings</p>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="your@hotel.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Access Code</label>
+                <input type="password" id="password" name="password" placeholder="Your access code" required>
+            </div>
+            <button type="submit">Sign In</button>
+            <div class="error" id="error"></div>
+        </form>
+        
+        <div class="register-link">
+            Don't have an account? <a href="/sellers">Sign up here</a>
+        </div>
+    </div>
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f5f5;
-            color: #222;
-        }
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // For MVP: simple auth (in production: validate with backend)
+            // Just store in localStorage and redirect
+            if (email && password.length >= 4) {
+                const agentId = 'seller_' + Math.random().toString(36).substr(2, 8);
+                localStorage.setItem('agentId', agentId);
+                localStorage.setItem('email', email);
+                window.location.href = '/sellers/portal';
+            } else {
+                document.getElementById('error').textContent = 'Invalid email or access code';
+                document.getElementById('error').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>"""
 
-        .container {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            height: 100vh;
-        }
-
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Dashboard - BookWithClaw</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        
+        .container { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+        
         /* Sidebar */
-        .sidebar {
-            background: #1a1a2e;
-            color: white;
-            padding: 20px;
-            overflow-y: auto;
+        .sidebar { background: #1a1a2e; color: white; padding: 20px; overflow-y: auto; }
+        .logo { font-size: 24px; font-weight: 700; color: #667eea; margin-bottom: 30px; }
+        .nav { list-style: none; }
+        .nav li { margin-bottom: 10px; }
+        .nav a { color: #999; text-decoration: none; padding: 12px; display: block; border-radius: 4px; cursor: pointer; }
+        .nav a:hover, .nav a.active { color: white; background: #667eea; }
+        
+        /* Main */
+        .main { padding: 30px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .header h1 { color: #1a1a2e; }
+        .logout-btn { padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        
+        /* Content sections */
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        /* Stats grid */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 32px; font-weight: 700; color: #667eea; }
+        .stat-label { font-size: 14px; color: #999; margin-top: 5px; }
+        
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th { background: #f9f9f9; padding: 15px; text-align: left; font-weight: 600; border-bottom: 1px solid #eee; }
+        td { padding: 15px; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f9f9f9; }
+        
+        /* Badges */
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        
+        /* Buttons */
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        .btn-secondary { background: #ddd; color: #333; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        
+        /* Forms */
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        input:focus { outline: none; border-color: #667eea; }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 100%; max-width: 500px; }
+        .modal-close { float: right; font-size: 24px; cursor: pointer; }
+        
+        @media (max-width: 1024px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
         }
-
-        .logo {
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin-bottom: 30px;
-            color: #ff6b35;
-        }
-
-        .nav-section {
-            margin-bottom: 30px;
-        }
-
-        .nav-section h3 {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: #888;
-            margin-bottom: 10px;
-        }
-
-        .nav-link {
-            display: block;
-            padding: 10px 15px;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-            color: white;
-            text-decoration: none;
-        }
-
-        .nav-link:hover,
-        .nav-link.active {
-            background: #ff6b35;
-        }
-
-        /* Main content */
-        .main {
-            overflow-y: auto;
-            padding: 30px;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            font-size: 2rem;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #ff6b35;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            color: #666;
-        }
-
-        .content-section {
-            display: none;
-        }
-
-        .content-section.active {
-            display: block;
-        }
-
-        .rooms-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .room-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .room-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .room-name {
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .room-status {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            background: #e8f5e9;
-            color: #388e3c;
-        }
-
-        .room-details {
-            margin: 15px 0;
-            font-size: 0.95rem;
-            color: #666;
-        }
-
-        .room-details div {
-            margin-bottom: 8px;
-        }
-
-        .room-rates {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-        }
-
-        .room-rate {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-
-        .rate-label {
-            color: #666;
-        }
-
-        .rate-value {
-            font-weight: 600;
-            color: #ff6b35;
-        }
-
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            margin-top: 15px;
-            background: #ff6b35;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.3s;
-            text-decoration: none;
-        }
-
-        .button:hover {
-            background: #e55a2b;
-        }
-
-        .button.secondary {
-            background: #1a1a2e;
-        }
-
-        .button.secondary:hover {
-            background: #000;
-        }
-
-        .offers-table {
-            width: 100%;
-            background: white;
-            border-collapse: collapse;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .offers-table thead {
-            background: #f5f5f5;
-            font-weight: 600;
-        }
-
-        .offers-table th,
-        .offers-table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-
-        .offers-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .offers-table tbody tr:hover {
-            background: #f9f9f9;
-        }
-
-        .offer-status {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-        }
-
-        .status-negotiating {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .status-accepted {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #999;
-        }
-
-        .empty-state p {
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-
+        
         @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-
-            .sidebar {
-                display: none;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .rooms-grid {
-                grid-template-columns: 1fr;
-            }
+            .container { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .stats { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Sidebar -->
         <div class="sidebar">
-            <div class="logo">🐚 BookWithClaw</div>
-            
-            <div class="nav-section">
-                <h3>Menu</h3>
-                <a class="nav-link active" onclick="showSection('dashboard')">📊 Dashboard</a>
-                <a class="nav-link" onclick="showSection('rooms')">🏨 Rooms</a>
-                <a class="nav-link" onclick="showSection('offers')">💰 Offers</a>
-                <a class="nav-link" onclick="showSection('bookings')">📅 Bookings</a>
-                <a class="nav-link" onclick="showSection('payouts')">💳 Payouts</a>
-            </div>
-
-            <div class="nav-section">
-                <h3>Account</h3>
-                <a class="nav-link" onclick="showSection('profile')">⚙️ Profile</a>
-                <a class="nav-link" onclick="logout()">🚪 Logout</a>
-            </div>
+            <div class="logo">📍 BWC</div>
+            <ul class="nav">
+                <li><a onclick="showSection('dashboard')" class="nav-link active">📊 Dashboard</a></li>
+                <li><a onclick="showSection('rooms')" class="nav-link">🏠 Rooms</a></li>
+                <li><a onclick="showSection('offers')" class="nav-link">📬 Offers</a></li>
+                <li><a onclick="showSection('bookings')" class="nav-link">📅 Bookings</a></li>
+                <li><a onclick="showSection('pricing')" class="nav-link">💰 Pricing</a></li>
+                <li><a onclick="showSection('profile')" class="nav-link">👤 Profile</a></li>
+            </ul>
         </div>
-
+        
+        <!-- Main Content -->
         <div class="main">
+            <div class="header">
+                <h1>Seller Dashboard</h1>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+            
             <!-- Dashboard Section -->
-            <div id="dashboard" class="content-section active">
-                <div class="header">
-                    <h1>Dashboard</h1>
-                    <span id="hotel-name" style="color: #666;"></span>
-                </div>
-
-                <div class="stats-grid">
+            <div id="dashboard" class="section active">
+                <h2>Welcome Back!</h2>
+                <p style="color: #666; margin-bottom: 30px;">Here's your hotel performance at a glance.</p>
+                
+                <div class="stats">
                     <div class="stat-card">
-                        <div class="stat-number" id="stat-rooms">0</div>
+                        <div class="stat-value">3</div>
                         <div class="stat-label">Active Listings</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="stat-offers">0</div>
+                        <div class="stat-value">2</div>
                         <div class="stat-label">Pending Offers</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="stat-bookings">0</div>
-                        <div class="stat-label">Completed Bookings</div>
+                        <div class="stat-value">5</div>
+                        <div class="stat-label">Total Bookings</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="stat-revenue">$0</div>
+                        <div class="stat-value">$1,750</div>
                         <div class="stat-label">Total Revenue</div>
                     </div>
                 </div>
-
-                <h2>Recent Offers</h2>
-                <div id="recent-offers"></div>
-            </div>
-
-            <!-- Rooms Section -->
-            <div id="rooms" class="content-section">
-                <div class="header">
-                    <h1>My Rooms</h1>
-                    <button class="button" onclick="showAddRoomForm()">+ Add Room</button>
-                </div>
-
-                <div id="add-room-form" style="display: none; background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3>Add New Room</h3>
-                    <div class="form-group">
-                        <label>Room Name</label>
-                        <input type="text" id="room-name" placeholder="e.g., Deluxe King">
-                    </div>
-                    <div class="form-group">
-                        <label>Capacity (Guests)</label>
-                        <input type="number" id="room-capacity" placeholder="2" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Base Rate (per night)</label>
-                        <input type="number" id="room-rate" placeholder="350" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Floor Price (minimum)</label>
-                        <input type="number" id="room-floor" placeholder="250" min="0">
-                    </div>
-                    <button class="button" onclick="createRoom()">Create Room</button>
-                    <button class="button secondary" onclick="hideAddRoomForm()">Cancel</button>
-                </div>
-
-                <div class="rooms-grid" id="rooms-list"></div>
-            </div>
-
-            <!-- Offers Section -->
-            <div id="offers" class="content-section">
-                <div class="header">
-                    <h1>Active Offers</h1>
-                </div>
-
-                <table class="offers-table">
+                
+                <h3 style="margin-top: 40px; margin-bottom: 20px;">Recent Offers</h3>
+                <table>
                     <thead>
                         <tr>
-                            <th>Room</th>
+                            <th>Guest</th>
+                            <th>Room Type</th>
                             <th>Dates</th>
-                            <th>Proposed Price</th>
-                            <th>Your Base</th>
+                            <th>Offered Price</th>
                             <th>Status</th>
-                            <th>Round</th>
-                            <th>Actions</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
-                    <tbody id="offers-list">
+                    <tbody>
                         <tr>
-                            <td colspan="7" class="empty-state">No active offers yet</td>
+                            <td>John Traveler</td>
+                            <td>Deluxe King</td>
+                            <td>Mar 22-24</td>
+                            <td>$320</td>
+                            <td><span class="badge badge-warning">Pending</span></td>
+                            <td>
+                                <button class="btn btn-success btn-sm" onclick="acceptOffer('off_001')">Accept</button>
+                                <button class="btn btn-danger btn-sm" onclick="declineOffer('off_001')">Decline</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Jane Smith ⭐5.0</td>
+                            <td>Standard Queen</td>
+                            <td>Mar 25-27</td>
+                            <td>$280</td>
+                            <td><span class="badge badge-warning">Pending</span></td>
+                            <td>
+                                <button class="btn btn-success btn-sm" onclick="acceptOffer('off_002')">Accept</button>
+                                <button class="btn btn-danger btn-sm" onclick="declineOffer('off_002')">Decline</button>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-
+            
+            <!-- Rooms Section -->
+            <div id="rooms" class="section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Your Rooms</h2>
+                    <button class="btn btn-primary" onclick="showModal('addRoomModal')">+ Add Room</button>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Room Name</th>
+                            <th>Capacity</th>
+                            <th>Base Rate</th>
+                            <th>Floor Price</th>
+                            <th>Bookings</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Deluxe King</td>
+                            <td>2 guests</td>
+                            <td>$350</td>
+                            <td>$280</td>
+                            <td>2</td>
+                            <td><span class="badge badge-success">Active</span></td>
+                            <td><button class="btn btn-primary btn-sm" onclick="editRoom('rm_1')">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>Standard Queen</td>
+                            <td>2 guests</td>
+                            <td>$250</td>
+                            <td>$200</td>
+                            <td>1</td>
+                            <td><span class="badge badge-success">Active</span></td>
+                            <td><button class="btn btn-primary btn-sm" onclick="editRoom('rm_2')">Edit</button></td>
+                        </tr>
+                        <tr>
+                            <td>Suite</td>
+                            <td>4 guests</td>
+                            <td>$500</td>
+                            <td>$400</td>
+                            <td>3</td>
+                            <td><span class="badge badge-success">Active</span></td>
+                            <td><button class="btn btn-primary btn-sm" onclick="editRoom('rm_3')">Edit</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Offers Section -->
+            <div id="offers" class="section">
+                <h2>Incoming Offers</h2>
+                <p style="color: #666; margin-bottom: 20px;">Review and respond to buyer intents.</p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Guest</th>
+                            <th>Room</th>
+                            <th>Check-in</th>
+                            <th>Check-out</th>
+                            <th>Your Rate</th>
+                            <th>Offered Price</th>
+                            <th>Expires</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>John Traveler 🆕</td>
+                            <td>Deluxe King</td>
+                            <td>Mar 22</td>
+                            <td>Mar 24</td>
+                            <td>$350</td>
+                            <td>$320</td>
+                            <td>24h</td>
+                            <td>
+                                <button class="btn btn-success btn-sm" onclick="acceptOffer('off_001')">✓</button>
+                                <button class="btn btn-danger btn-sm" onclick="declineOffer('off_001')">✗</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
             <!-- Bookings Section -->
-            <div id="bookings" class="content-section">
-                <div class="header">
-                    <h1>Completed Bookings</h1>
-                </div>
-                <div id="bookings-list" class="empty-state">
-                    <p>No completed bookings yet</p>
-                </div>
+            <div id="bookings" class="section">
+                <h2>Your Bookings</h2>
+                <p style="color: #666; margin-bottom: 20px;">Confirmed reservations and completed stays.</p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Guest</th>
+                            <th>Room</th>
+                            <th>Check-in</th>
+                            <th>Check-out</th>
+                            <th>Price</th>
+                            <th>Your Earnings</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Robert Johnson</td>
+                            <td>Suite</td>
+                            <td>Mar 20</td>
+                            <td>Mar 22</td>
+                            <td>$450</td>
+                            <td>$441.90</td>
+                            <td><span class="badge badge-success">Confirmed</span></td>
+                        </tr>
+                        <tr>
+                            <td>Alice Wonder ⭐5.0</td>
+                            <td>Deluxe King</td>
+                            <td>Mar 15</td>
+                            <td>Mar 17</td>
+                            <td>$400</td>
+                            <td>$392.80</td>
+                            <td><span class="badge badge-success">Completed</span></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-
-            <!-- Payouts Section -->
-            <div id="payouts" class="content-section">
-                <div class="header">
-                    <h1>Payouts</h1>
+            
+            <!-- Pricing Section -->
+            <div id="pricing" class="section">
+                <h2>Pricing Management</h2>
+                <p style="color: #666; margin-bottom: 30px;">Set rates and floor prices for your rooms.</p>
+                
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3>Deluxe King</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 15px;">
+                        <div class="form-group">
+                            <label>Base Rate</label>
+                            <input type="number" value="350" />
+                        </div>
+                        <div class="form-group">
+                            <label>Floor Price</label>
+                            <input type="number" value="280" />
+                        </div>
+                        <div class="form-group">
+                            <label style="opacity: 0;">Action</label>
+                            <button class="btn btn-primary" style="width: 100%;">Save</button>
+                        </div>
+                    </div>
                 </div>
-                <div id="payouts-list" class="empty-state">
-                    <p>No payouts yet</p>
-                </div>
+                
+                <p style="background: #e8f4f8; padding: 15px; border-radius: 4px; margin-top: 20px;">
+                    💡 <strong>Tip:</strong> Set your floor price to your break-even point. We won't show offers below this price.
+                </p>
             </div>
-
+            
             <!-- Profile Section -->
-            <div id="profile" class="content-section">
-                <div class="header">
-                    <h1>Hotel Profile</h1>
-                </div>
-                <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px;">
+            <div id="profile" class="section">
+                <h2>Hotel Profile</h2>
+                
+                <div style="background: white; padding: 30px; border-radius: 8px; max-width: 600px;">
                     <div class="form-group">
                         <label>Hotel Name</label>
-                        <input type="text" id="hotel-name-input" placeholder="My Hotel">
+                        <input type="text" value="Your Hotel Name" />
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="hotel-email" placeholder="hotel@example.com">
+                        <input type="email" value="hotel@example.com" />
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="tel" value="+1-555-0000" />
                     </div>
                     <div class="form-group">
                         <label>Location</label>
-                        <input type="text" id="hotel-location" placeholder="City, State">
+                        <input type="text" value="San Francisco, CA" />
                     </div>
-                    <button class="button" onclick="updateProfile()">Save Changes</button>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea rows="4">Beautiful 3-star hotel in downtown</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Check-in Time</label>
+                        <input type="time" value="15:00" />
+                    </div>
+                    <div class="form-group">
+                        <label>Check-out Time</label>
+                        <input type="time" value="11:00" />
+                    </div>
+                    <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = window.location.origin;
-        let authToken = localStorage.getItem('authToken');
-
-        if (!authToken) {
-            window.location.href = '/sellers';
+        // Check if logged in
+        if (!localStorage.getItem('agentId')) {
+            window.location.href = '/sellers/login';
         }
-
-        function showSection(section) {
-            document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
-            document.getElementById(section).classList.add('active');
-            
-            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            // Update nav
+            document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
             event.target.classList.add('active');
-
-            if (section === 'dashboard') loadDashboard();
-            if (section === 'rooms') loadRooms();
-            if (section === 'offers') loadOffers();
         }
-
-        async function loadDashboard() {
-            try {
-                const response = await fetch(`${API_BASE}/sellers/dashboard`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const data = await response.json();
-
-                document.getElementById('hotel-name').textContent = data.profile.name;
-                document.getElementById('stat-rooms').textContent = data.stats.active_listings;
-                document.getElementById('stat-offers').textContent = data.stats.pending_offers;
-                document.getElementById('stat-bookings').textContent = data.stats.completed_bookings;
-                document.getElementById('stat-revenue').textContent = `$${data.stats.total_revenue}`;
-
-                const offersHTML = data.recent_offers.length > 0 
-                    ? data.recent_offers.map(o => `<div style="background: white; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                        <strong>${o.room_name}</strong> - ${o.proposed_price} (${o.status})
-                      </div>`).join('')
-                    : '<p style="color: #999;">No recent offers</p>';
-                document.getElementById('recent-offers').innerHTML = offersHTML;
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
-            }
+        
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
         }
-
-        async function loadRooms() {
-            try {
-                const response = await fetch(`${API_BASE}/sellers/rooms`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const rooms = await response.json();
-
-                const html = rooms.map(room => `
-                    <div class="room-card">
-                        <div class="room-header">
-                            <div class="room-name">${room.name}</div>
-                            <span class="room-status">${room.status}</span>
-                        </div>
-                        <div class="room-details">
-                            <div>👥 Capacity: ${room.capacity} guests</div>
-                            <div>👁️ Views: ${room.views}</div>
-                            <div>💬 Inquiries: ${room.inquiries}</div>
-                        </div>
-                        <div class="room-rates">
-                            <div class="room-rate">
-                                <span class="rate-label">Base Rate:</span>
-                                <span class="rate-value">$${room.base_rate}</span>
-                            </div>
-                            <div class="room-rate">
-                                <span class="rate-label">Floor Price:</span>
-                                <span class="rate-value">$${room.floor_price}</span>
-                            </div>
-                        </div>
-                        <button class="button secondary" onclick="editRoom('${room.room_id}')">Edit</button>
-                    </div>
-                `).join('');
-
-                document.getElementById('rooms-list').innerHTML = html;
-            } catch (error) {
-                console.error('Error loading rooms:', error);
-            }
+        
+        function acceptOffer(offerId) {
+            alert('Offer ' + offerId + ' accepted!\\n\\nGuest will receive confirmation. Prepare your room!');
         }
-
-        async function loadOffers() {
-            try {
-                const response = await fetch(`${API_BASE}/sellers/offers`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                const offers = await response.json();
-
-                if (offers.length === 0) {
-                    document.getElementById('offers-list').innerHTML = '<tr><td colspan="7" class="empty-state">No active offers</td></tr>';
-                    return;
-                }
-
-                const html = offers.map(offer => `
-                    <tr>
-                        <td>${offer.room_name}</td>
-                        <td>${offer.dates.checkin} → ${offer.dates.checkout}</td>
-                        <td>$${offer.proposed_price}</td>
-                        <td>$${offer.your_base}</td>
-                        <td><span class="offer-status status-${offer.status}">${offer.status}</span></td>
-                        <td>${offer.round}</td>
-                        <td>
-                            <button class="button" onclick="acceptOffer('${offer.offer_id}')">Accept</button>
-                            <button class="button secondary" onclick="rejectOffer('${offer.offer_id}')">Reject</button>
-                        </td>
-                    </tr>
-                `).join('');
-
-                document.getElementById('offers-list').innerHTML = html;
-            } catch (error) {
-                console.error('Error loading offers:', error);
-            }
+        
+        function declineOffer(offerId) {
+            alert('Offer ' + offerId + ' declined.');
         }
-
-        function showAddRoomForm() {
-            document.getElementById('add-room-form').style.display = 'block';
-        }
-
-        function hideAddRoomForm() {
-            document.getElementById('add-room-form').style.display = 'none';
-        }
-
-        async function createRoom() {
-            const roomData = {
-                name: document.getElementById('room-name').value,
-                capacity: parseInt(document.getElementById('room-capacity').value),
-                base_rate: parseInt(document.getElementById('room-rate').value),
-                floor_price: parseInt(document.getElementById('room-floor').value),
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/sellers/rooms`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(roomData)
-                });
-
-                if (response.ok) {
-                    hideAddRoomForm();
-                    loadRooms();
-                    alert('Room created successfully!');
-                }
-            } catch (error) {
-                console.error('Error creating room:', error);
-                alert('Failed to create room');
-            }
-        }
-
-        async function acceptOffer(offerId) {
-            try {
-                const response = await fetch(`${API_BASE}/sellers/offers/${offerId}/accept`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-
-                if (response.ok) {
-                    loadOffers();
-                    alert('Offer accepted!');
-                }
-            } catch (error) {
-                console.error('Error accepting offer:', error);
-                alert('Failed to accept offer');
-            }
-        }
-
-        async function rejectOffer(offerId) {
-            try {
-                const response = await fetch(`${API_BASE}/sellers/offers/${offerId}/reject`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-
-                if (response.ok) {
-                    loadOffers();
-                    alert('Offer rejected');
-                }
-            } catch (error) {
-                console.error('Error rejecting offer:', error);
-                alert('Failed to reject offer');
-            }
-        }
-
+        
         function editRoom(roomId) {
             alert('Edit room: ' + roomId);
         }
-
-        function updateProfile() {
-            alert('Profile updated');
+        
+        function saveProfile() {
+            alert('Profile updated!');
         }
-
+        
         function logout() {
-            localStorage.removeItem('authToken');
-            window.location.href = '/sellers';
+            localStorage.removeItem('agentId');
+            localStorage.removeItem('email');
+            window.location.href = '/sellers/login';
         }
-
-        // Load dashboard on page load
-        loadDashboard();
     </script>
 </body>
-</html>
-"""
+</html>"""
 
 
-@router.get("/dashboard", response_class=HTMLResponse)
-async def get_dashboard_ui():
-    """Serve seller dashboard HTML"""
+@router.get("/login", response_class=HTMLResponse)
+async def login_page():
+    """Serve login page"""
+    return LOGIN_HTML
+
+
+@router.get("/portal", response_class=HTMLResponse)
+async def dashboard_page():
+    """Serve seller dashboard portal"""
     return DASHBOARD_HTML
