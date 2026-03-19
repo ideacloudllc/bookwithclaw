@@ -12,7 +12,7 @@ class Room(Base):
     __tablename__ = "rooms"
 
     id = Column(String, primary_key=True, index=True)
-    seller_id = Column(String, ForeignKey("agent.agent_id"), index=True)
+    seller_id = Column(String, ForeignKey("agents.agent_id"), index=True)
     name = Column(String, nullable=False)
     type = Column(String, nullable=False)  # standard, deluxe, suite, economy
     description = Column(String, nullable=True)

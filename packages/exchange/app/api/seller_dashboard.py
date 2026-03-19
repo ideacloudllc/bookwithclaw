@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Cookie, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -40,8 +40,17 @@ class SellerProfile(BaseModel):
     description: Optional[str] = None
 
 
-def get_seller_id_from_token(token: Optional[str] = Cookie(None)) -> str:
-    """Extract seller ID from auth token cookie."""
+def get_seller_id_from_token(
+    token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None)
+) -> str:
+    """Extract seller ID from auth token (cookie or Authorization header)."""
+    # Check Authorization header first (Bearer token)
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
@@ -137,10 +146,10 @@ async def get_seller_profile(
         "agent_id": seller.agent_id,
         "hotel_name": seller.hotel_name,
         "email": seller.email,
-        "address": seller.address,
-        "phone": seller.phone,
-        "check_in_time": seller.check_in_time,
-        "check_out_time": seller.check_out_time,
+        "address": None,
+        "phone": None,
+        "check_in_time": "14:00",
+        "check_out_time": "11:00",
     }
 
 
@@ -159,17 +168,9 @@ async def update_seller_profile(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Update fields if provided
+    # Update hotel_name if provided
     if "hotel_name" in profile_data:
         seller.hotel_name = profile_data["hotel_name"]
-    if "address" in profile_data:
-        seller.address = profile_data["address"]
-    if "phone" in profile_data:
-        seller.phone = profile_data["phone"]
-    if "check_in_time" in profile_data:
-        seller.check_in_time = profile_data["check_in_time"]
-    if "check_out_time" in profile_data:
-        seller.check_out_time = profile_data["check_out_time"]
     
     await session.commit()
     
@@ -177,10 +178,10 @@ async def update_seller_profile(
         "agent_id": seller.agent_id,
         "hotel_name": seller.hotel_name,
         "email": seller.email,
-        "address": seller.address,
-        "phone": seller.phone,
-        "check_in_time": seller.check_in_time,
-        "check_out_time": seller.check_out_time,
+        "address": None,
+        "phone": None,
+        "check_in_time": "14:00",
+        "check_out_time": "11:00",
     }
 
 
