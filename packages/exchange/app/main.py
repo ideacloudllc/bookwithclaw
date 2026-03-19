@@ -8,7 +8,7 @@ import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy import text
 
 from app.config import settings
@@ -112,10 +112,38 @@ app.include_router(sessions_router)          # Negotiation sessions
 app.include_router(seller_dashboard_router)  # Seller dashboard API
 app.include_router(buyer_dashboard_router)   # Buyer dashboard API (auth-protected)
 
-# Mount React seller dashboard (new version)
+# React SPA catch-all route (must come BEFORE mount)
 static_dir = Path(__file__).parent / "static" / "seller-dashboard"
+index_file = static_dir / "index.html"
+
 if static_dir.exists():
-    app.mount("/sellers", StaticFiles(directory=str(static_dir), html=True), name="seller_app")
+    # First, try to serve actual static files (assets, etc.)
+    # If not found, serve index.html for SPA routing
+    
+    @app.get("/sellers/{full_path:path}", include_in_schema=False)
+    async def seller_spa_catchall(full_path: str):
+        """Serve React app files or index.html for SPA routing"""
+        # Build the file path
+        file_path = static_dir / full_path
+        
+        # If it's a real file, serve it
+        if file_path.is_file():
+            return FileResponse(file_path)
+        
+        # For SPA routes (non-files), serve index.html and let React Router handle it
+        if index_file.exists():
+            return FileResponse(index_file)
+        
+        return {"detail": "Not Found"}
+    
+    # Also mount the root /sellers path
+    @app.get("/sellers/", include_in_schema=False)
+    async def seller_spa_root():
+        """Serve React app root"""
+        if index_file.exists():
+            return FileResponse(index_file)
+        return {"detail": "Not Found"}
+    
     logger.info(f"✓ React seller dashboard mounted at /sellers")
 
 # Mount legacy dashboard UI (fallback if React version not available)

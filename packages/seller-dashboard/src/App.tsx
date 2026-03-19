@@ -6,20 +6,19 @@ import { Dashboard } from './pages/Dashboard';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/sellers">
       <Routes>
-        <Route path="/sellers" element={<Signup />} />
-        <Route path="/sellers/login" element={<Login />} />
+        <Route path="/" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
         <Route
-          path="/sellers/portal"
+          path="/portal"
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/sellers" replace />} />
-        <Route path="*" element={<Navigate to="/sellers" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
