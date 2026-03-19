@@ -15,7 +15,7 @@ import { z } from 'zod';
 export const BaseMessageSchema = z.object({
   type: z.string(),
   timestamp: z.number().int().positive(),
-  signature: z.string().hex(),
+  signature: z.string().regex(/^[0-9a-f]*$/),
   sender_id: z.string(),
   session_id: z.string(),
   round_number: z.number().int().nonnegative(),

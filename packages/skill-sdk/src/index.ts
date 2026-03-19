@@ -5,7 +5,7 @@
  */
 
 // Crypto utilities
-export { generateKeypair, signMessage, verifySignature, getPublicKey } from './crypto';
+export { generateKeypair, signMessage, verifySignature, getPublicKeyFromPrivate, canonicalJSON } from './crypto';
 
 // Message types and schemas
 export {

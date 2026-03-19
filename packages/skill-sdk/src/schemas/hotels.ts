@@ -20,7 +20,13 @@ export const HotelBuyerIntentSchema = z.object({
       cancellation_policy: z.enum(["strict", "moderate", "flexible"]).optional(),
     })
     .optional(),
-});
+}).refine(
+  (data) => data.checkin_date < data.checkout_date,
+  {
+    message: "Checkout date must be after checkin date",
+    path: ["checkout_date"],
+  }
+);
 
 export type HotelBuyerIntent = z.infer<typeof HotelBuyerIntentSchema>;
 
@@ -40,7 +46,13 @@ export const HotelSellerAskSchema = z.object({
       cancellation_policy: z.enum(["strict", "moderate", "flexible"]).optional(),
     })
     .optional(),
-});
+}).refine(
+  (data) => data.checkin_date < data.checkout_date,
+  {
+    message: "Checkout date must be after checkin date",
+    path: ["checkout_date"],
+  }
+);
 
 export type HotelSellerAsk = z.infer<typeof HotelSellerAskSchema>;
 

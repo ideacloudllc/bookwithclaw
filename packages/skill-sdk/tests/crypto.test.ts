@@ -59,8 +59,8 @@ describe("Crypto Utilities", () => {
     // Sign
     let signature = await signMessage(message, privateKey);
 
-    // Tamper with signature
-    signature = signature.substring(0, 126) + "00";
+    // Tamper with signature - flip multiple bits
+    signature = signature.substring(0, 32) + "ffffffffffffffffffffffffffffffff" + signature.substring(64);
 
     // Try to verify tampered signature
     const isValid = await verifySignature(message, signature, publicKey);

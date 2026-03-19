@@ -38,7 +38,7 @@ export interface HotelBuyerConfig {
 }
 
 export interface BuyerSkillOptions {
-  exchangeUrl: string;
+  exchangeUrl: string; // e.g., 'ws://localhost:8000'
   authToken: string;
   config: HotelBuyerConfig;
 }
@@ -57,6 +57,7 @@ export class BuyerSkill extends EventEmitter {
   private connection: ExchangeConnection | null = null;
   private config: HotelBuyerConfig;
   private authToken: string;
+  private exchangeUrl: string;
   private sessionId: string | null = null;
   private currentRound = 0;
   private bestOfferCents: number | null = null;
@@ -66,24 +67,13 @@ export class BuyerSkill extends EventEmitter {
     super();
     this.config = options.config;
     this.authToken = options.authToken;
+    this.exchangeUrl = options.exchangeUrl;
 
-    // Initialize WebSocket connection
-    this.connection = new ExchangeConnection({
-      exchangeUrl: options.exchangeUrl,
-      sessionId: 'temp-session-id', // Will be set after announcing intent
-      authToken: options.authToken,
-    });
+    // Initialize WebSocket connection will be created when announcing intent
+    // (need sessionId first, which we generate during announce())
+    this.connection = null;
 
-    // Set up message handlers
-    this.connection.on('message', (msg) => this.handleMessage(msg));
-    this.connection.on('error', (error) => this.emit('error', error));
-    this.connection.on('disconnected', () => {
-      this.emit('disconnected');
-      // Auto-reconnect if not explicitly disconnected
-      if (this.sessionId) {
-        this.connection!.connect().catch((e) => this.emit('error', e));
-      }
-    });
+    // We'll set up message handlers after creating the connection
   }
 
   /**
@@ -95,6 +85,20 @@ export class BuyerSkill extends EventEmitter {
     try {
       // Generate session ID
       this.sessionId = `session_${uuidv4()}`;
+
+      // Initialize WebSocket connection with the session ID
+      this.connection = new ExchangeConnection({
+        exchangeUrl: this.exchangeUrl,
+        sessionId: this.sessionId,
+        authToken: this.authToken,
+      });
+
+      // Set up message handlers
+      this.connection.on('message', (msg) => this.handleMessage(msg));
+      this.connection.on('error', (error) => this.emit('error', error));
+      this.connection.on('disconnected', () => {
+        this.emit('disconnected');
+      });
 
       // Create intent message
       const now = Math.floor(Date.now() / 1000);
@@ -121,11 +125,10 @@ export class BuyerSkill extends EventEmitter {
       intentMessage.signature = await signMessage(messageBytes, this.config.privateKey);
 
       // Connect to exchange
-      this.connection!.url = `${this.connection!.url.split('/ws/')[0]}/ws/session/${this.sessionId}`;
-      await this.connection!.connect();
+      await this.connection.connect();
 
       // Send intent
-      await this.connection!.send(intentMessage);
+      await this.connection.send(intentMessage);
       this.emit('intent_announced', { sessionId: this.sessionId });
 
       // Wait for deal to be made (max 120 seconds)
@@ -204,8 +207,10 @@ export class BuyerSkill extends EventEmitter {
    * Handle seller ask - evaluate and decide whether to counter or accept.
    */
   private async handleSellerAsk(ask: SellerAskMessage): Promise<void> {
+    const floorPrice = ask.floor_price_cents as number;
+    
     // Check if ask is within budget
-    if (ask.floor_price_cents > this.config.budgetCeilingCents) {
+    if (floorPrice > this.config.budgetCeilingCents) {
       // Too expensive, walk away
       await this.sendWalkaway('Price exceeds budget');
       this.emit('session_failed', 'Seller price exceeds budget');
@@ -213,13 +218,13 @@ export class BuyerSkill extends EventEmitter {
     }
 
     // Store best offer
-    this.bestOfferCents = ask.floor_price_cents;
+    this.bestOfferCents = floorPrice;
     this.bestOfferFromSeller = ask.sender_id;
 
     // If floor price is near our budget, accept it
     // Otherwise, counter with a price between floor and our budget
     const counterPrice = Math.min(
-      Math.floor((ask.floor_price_cents + this.config.budgetCeilingCents) / 2),
+      Math.floor((floorPrice + this.config.budgetCeilingCents) / 2),
       this.config.budgetCeilingCents
     );
 
@@ -236,22 +241,24 @@ export class BuyerSkill extends EventEmitter {
    * Handle seller counter-offer.
    */
   private async handleSellerCounter(counter: SellerCounterOfferMessage): Promise<void> {
+    const counterPrice = counter.counter_price_cents as number;
+    
     // Update best offer
-    this.bestOfferCents = counter.counter_price_cents;
+    this.bestOfferCents = counterPrice;
 
     // If price is within budget, decide to accept or counter again
-    if (counter.counter_price_cents <= this.config.budgetCeilingCents) {
+    if (counterPrice <= this.config.budgetCeilingCents) {
       // Accept the deal (max 3 rounds)
       if (this.currentRound >= 3) {
-        await this.sendDealAccepted(counter.counter_price_cents);
+        await this.sendDealAccepted(counterPrice);
       } else {
         // Counter one more time
-        const newOffer = counter.counter_price_cents - 500; // Reduce by $5
+        const newOffer = counterPrice - 500; // Reduce by $5
         if (newOffer >= this.config.budgetCeilingCents * 0.9) {
           await this.sendCounterOffer(newOffer);
         } else {
           // Accept current offer
-          await this.sendDealAccepted(counter.counter_price_cents);
+          await this.sendDealAccepted(counterPrice);
         }
       }
     } else {

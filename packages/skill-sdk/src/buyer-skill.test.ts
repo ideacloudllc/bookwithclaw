@@ -11,8 +11,8 @@ describe('BuyerSkill', () => {
   let publicKey: string;
   let privateKey: string;
 
-  beforeEach(async () => {
-    const keys = await generateKeypair();
+  beforeEach(() => {
+    const keys = generateKeypair();
     publicKey = keys.publicKey;
     privateKey = keys.privateKey;
 
@@ -36,13 +36,15 @@ describe('BuyerSkill', () => {
     expect(buyerSkill).toBeDefined();
   });
 
-  it('should emit events', (done) => {
-    buyerSkill.on('test_event', () => {
-      expect(true).toBe(true);
-      done();
-    });
+  it('should emit events', () => {
+    return new Promise<void>((resolve) => {
+      buyerSkill.on('test_event', () => {
+        expect(true).toBe(true);
+        resolve();
+      });
 
-    buyerSkill.emit('test_event');
+      buyerSkill.emit('test_event');
+    });
   });
 
   it('should handle disconnect', () => {

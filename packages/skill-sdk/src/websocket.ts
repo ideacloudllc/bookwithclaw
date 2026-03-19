@@ -73,7 +73,8 @@ export class ExchangeConnection extends EventEmitter {
         });
 
         this.ws.addEventListener('message', (event) => {
-          const message = parseMessage(event.data);
+          const data = typeof event.data === 'string' ? event.data : event.data.toString();
+          const message = parseMessage(data);
           if (message) {
             this.emit('message', message);
           }

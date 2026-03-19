@@ -2,16 +2,22 @@
  * Ed25519 cryptographic utilities for agent message signing and verification.
  */
 
-import { ed25519 } from '@noble/ed25519';
+import { getPublicKey, sign, verify, utils, etc } from '@noble/ed25519';
+import { createHash } from 'crypto';
+
+// Configure SHA-512 for @noble/ed25519
+etc.sha512Sync = (message: Uint8Array) => {
+  return new Uint8Array(createHash('sha512').update(message).digest());
+};
 
 /**
- * Generate an Ed25519 keypair.
+ * Generate an Ed25519 keypair (synchronous).
  * 
  * @returns Object with { publicKey, privateKey } as hex strings
  */
-export async function generateKeypair() {
-  const privateKey = ed25519.utils.randomPrivateKey();
-  const publicKey = await ed25519.getPublicKeyAsync(privateKey);
+export function generateKeypair() {
+  const privateKey = utils.randomPrivateKey();
+  const publicKey = getPublicKey(privateKey);
   
   return {
     publicKey: Buffer.from(publicKey).toString('hex'),
@@ -28,7 +34,7 @@ export async function generateKeypair() {
  */
 export async function signMessage(message: Buffer, privateKey: string): Promise<string> {
   const privateKeyBytes = Buffer.from(privateKey, 'hex');
-  const signature = await ed25519.signAsync(message, privateKeyBytes);
+  const signature = await sign(message, privateKeyBytes);
   return Buffer.from(signature).toString('hex');
 }
 
@@ -48,7 +54,7 @@ export async function verifySignature(
   try {
     const signatureBytes = Buffer.from(signature, 'hex');
     const publicKeyBytes = Buffer.from(publicKey, 'hex');
-    const isValid = await ed25519.verifyAsync(signatureBytes, message, publicKeyBytes);
+    const isValid = await verify(signatureBytes, message, publicKeyBytes);
     return isValid;
   } catch {
     return false;
@@ -61,8 +67,37 @@ export async function verifySignature(
  * @param privateKey - Private key as hex string
  * @returns Public key as hex string
  */
-export async function getPublicKey(privateKey: string): Promise<string> {
+export function getPublicKeyFromPrivate(privateKey: string): string {
   const privateKeyBytes = Buffer.from(privateKey, 'hex');
-  const publicKey = await ed25519.getPublicKeyAsync(privateKeyBytes);
+  const publicKey = getPublicKey(privateKeyBytes);
   return Buffer.from(publicKey).toString('hex');
+}
+
+/**
+ * Produce canonical JSON with sorted keys (RFC 7159 compliant).
+ * Used for message signing to ensure consistent serialization.
+ * 
+ * @param obj - Object to serialize
+ * @returns Canonical JSON string with sorted keys
+ */
+export function canonicalJSON(obj: any): string {
+  return JSON.stringify(sortKeys(obj));
+}
+
+/**
+ * Recursively sort object keys for canonical JSON.
+ */
+function sortKeys(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(sortKeys);
+  } else if (obj !== null && typeof obj === 'object') {
+    const sorted: any = {};
+    const keys = Object.keys(obj).sort();
+    for (const key of keys) {
+      sorted[key] = sortKeys(obj[key]);
+    }
+    return sorted;
+  } else {
+    return obj;
+  }
 }

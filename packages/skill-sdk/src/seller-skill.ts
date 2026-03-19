@@ -143,10 +143,16 @@ export class SellerSkill extends EventEmitter {
    * Handle buyer intent - evaluate and decide whether to publish an ask.
    */
   private async handleBuyerIntent(intent: BuyerIntentMessage): Promise<void> {
+    const checkInDate = intent.check_in_date as string;
+    const checkOutDate = intent.check_out_date as string;
+    const roomTypes = intent.room_types as string[];
+    const budgetCeiling = intent.budget_ceiling_cents as number;
+    const roundNum = intent.round_number as number;
+    
     // Check if dates align
     if (
-      intent.check_in_date > this.config.availableToDate ||
-      intent.check_out_date < this.config.availableFromDate
+      checkInDate > this.config.availableToDate ||
+      checkOutDate < this.config.availableFromDate
     ) {
       // Dates don't match, skip
       return;
@@ -154,22 +160,22 @@ export class SellerSkill extends EventEmitter {
 
     // Check if room type is acceptable
     if (
-      intent.room_types.length > 0 &&
-      !intent.room_types.includes(this.config.roomType)
+      roomTypes.length > 0 &&
+      !roomTypes.includes(this.config.roomType)
     ) {
       // Room type not wanted, skip
       return;
     }
 
     // Check if buyer can afford our floor price
-    if (intent.budget_ceiling_cents < this.config.floorPriceCents) {
+    if (budgetCeiling < this.config.floorPriceCents) {
       // Buyer's budget is below our floor, skip
       return;
     }
 
     // Publish an ask
     this.currentSessionId = intent.session_id;
-    this.currentRound = intent.round_number + 1;
+    this.currentRound = roundNum + 1;
     this.bestOfferCents = null;
     await this.publishAsk(intent);
   }
@@ -182,24 +188,26 @@ export class SellerSkill extends EventEmitter {
       return; // Not our session
     }
 
+    const offerPrice = counter.offer_price_cents as number;
+    
     // Store best offer
-    this.bestOfferCents = counter.offer_price_cents;
+    this.bestOfferCents = offerPrice;
 
     // If offer is at or above floor, counter with a price between floor and base
-    if (counter.offer_price_cents >= this.config.floorPriceCents) {
+    if (offerPrice >= this.config.floorPriceCents) {
       // If offer is close to our floor, accept it
       // Otherwise, counter back
       if (
-        counter.offer_price_cents >= this.config.floorPriceCents * 1.1 ||
+        offerPrice >= this.config.floorPriceCents * 1.1 ||
         this.currentRound >= 3
       ) {
         // Accept the deal
-        await this.sendDealAccepted(counter.offer_price_cents);
+        await this.sendDealAccepted(offerPrice);
       } else {
         // Counter with a price above buyer's offer but below our base
         const counterPrice = Math.min(
           Math.floor(
-            (counter.offer_price_cents + this.config.floorPriceCents) / 1.1
+            (offerPrice + this.config.floorPriceCents) / 1.1
           ),
           this.config.basePriceCents
         );
