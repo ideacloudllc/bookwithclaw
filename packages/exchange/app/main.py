@@ -16,9 +16,8 @@ from app.api.health import router as health_router
 from app.api.sessions import router as sessions_router
 from app.api.landing import router as landing_router
 from app.api.seller_dashboard import router as seller_dashboard_router
-from app.api.dashboard_ui import router as dashboard_ui_router
+from app.api.dashboard_ui import router as dashboard_ui_router, buyer_router as buyer_ui_router
 from app.api.buyer_dashboard import router as buyer_dashboard_router
-from app.api.buyer_ui import router as buyer_ui_router
 
 logger = logging.getLogger(__name__)
 
