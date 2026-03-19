@@ -16,7 +16,7 @@ from app.core.state_machine import (
     NegotiationStateMachine,
 )
 from app.dependencies import get_current_agent
-from app.main import SessionLocal, redis_client
+from app.database import SessionLocal
 from app.models.session import SessionState
 from app.schemas.messages import (
     DealAcceptedMessage,
@@ -114,6 +114,7 @@ async def websocket_endpoint(session_id: str, websocket: WebSocket):
     logger.info(f"Agent {agent_id} connected to session {session_id}")
 
     # Get database session and services
+    from app.main import redis_client
     async with SessionLocal() as db:
         order_book = OrderBook(redis_client)
         state_machine = NegotiationStateMachine(db)

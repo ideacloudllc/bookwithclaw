@@ -5,25 +5,25 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
+from app.config import settings
+from app import database  # Initialize database module first
+
+# Now safe to import routers that depend on database
 from app.api.agents import router as agents_router
 from app.api.health import router as health_router
 from app.api.sessions import router as sessions_router
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Global database and redis connections
-engine = None
-SessionLocal = None
+# Global redis client (database handled by database module)
 redis_client = None
 
 
-async def get_db() -> AsyncSession:
-    """Get database session."""
-    async with SessionLocal() as session:
+async def get_db():
+    """Get database session from database module."""
+    async with database.SessionLocal() as session:
         yield session
 
 
@@ -35,26 +35,21 @@ async def get_redis():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan: startup and shutdown."""
-    global engine, SessionLocal, redis_client
+    global redis_client
 
     # Startup
     logger.info("Starting BookWithClaw Exchange...")
 
-    # Initialize database
-    engine = create_async_engine(
-        settings.database_url,
-        echo=settings.environment == "development",
-        future=True,
-    )
-    SessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    # Initialize database via database module
+    await database.init_db()
 
     # Initialize Redis
     redis_client = await redis.from_url(settings.redis_url, decode_responses=True)
 
     # Test connections
     try:
-        async with SessionLocal() as session:
-            await session.execute("SELECT 1")
+        async with database.SessionLocal() as session:
+            await session.execute(text("SELECT 1"))
         logger.info("✓ PostgreSQL connected")
     except Exception as e:
         logger.error(f"✗ PostgreSQL connection failed: {e}")
@@ -72,8 +67,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down BookWithClaw Exchange...")
-    if engine:
-        await engine.dispose()
+    await database.close_db()
     if redis_client:
         await redis_client.close()
     logger.info("✓ Shutdown complete")

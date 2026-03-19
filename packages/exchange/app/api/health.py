@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 
 router = APIRouter()
 
@@ -10,7 +11,8 @@ router = APIRouter()
 @router.get("/health")
 async def health_check() -> dict:
     """Check exchange health: database and Redis connectivity."""
-    from app.main import redis_client, SessionLocal
+    from app.main import redis_client
+    from app.database import SessionLocal
 
     health = {
         "status": "healthy",
@@ -21,7 +23,7 @@ async def health_check() -> dict:
     # Check database
     try:
         async with SessionLocal() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
         health["services"]["database"] = True
     except Exception as e:
         health["status"] = "degraded"

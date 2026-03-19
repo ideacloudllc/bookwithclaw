@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.signing import create_jwt_token
-from app.main import SessionLocal
+from app.database import SessionLocal
 from app.models.agent import Agent, AgentRole
 
 router = APIRouter(prefix="/agents", tags=["agents"])

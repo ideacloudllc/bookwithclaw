@@ -1,0 +1,23 @@
+{
+  "name": "bookwithclaw-skills",
+  "version": "0.1.0",
+  "description": "Buyer and Seller Skills for BookWithClaw Exchange",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "ts-node test-negotiation.ts",
+    "dev": "ts-node test-negotiation.ts --watch"
+  },
+  "keywords": ["bookwithclaw", "exchange", "negotiation", "hotel"],
+  "author": "BookWithClaw Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.7.0",
+    "ts-node": "^10.9.0"
+  }
+}
