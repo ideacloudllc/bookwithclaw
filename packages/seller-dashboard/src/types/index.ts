@@ -25,13 +25,18 @@ export interface Offer {
 
 export interface Booking {
   id: string;
-  guest_name: string;
-  room: string;
-  room_id: string;
-  check_in: string;
-  check_out: string;
-  rate: number;
-  status: string;
+  guest_name?: string;
+  room?: string;
+  room_name?: string;
+  room_id?: string;
+  check_in?: string;
+  checkin_date?: string;
+  check_out?: string;
+  checkout_date?: string;
+  rate?: number;
+  agreed_price?: number;
+  final_price?: number;
+  status?: string;
 }
 
 export interface SellerProfile {

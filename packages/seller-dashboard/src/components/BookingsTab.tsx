@@ -34,15 +34,15 @@ export const BookingsTab = () => {
             <tbody>
               {bookings.map((booking, idx) => (
                 <tr key={booking.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{booking.guest_name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{booking.room}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{booking.guest_name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{booking.room || '-'}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(booking.check_in).toLocaleDateString()}
+                    {booking.check_in ? new Date(booking.check_in).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(booking.check_out).toLocaleDateString()}
+                    {booking.check_out ? new Date(booking.check_out).toLocaleDateString() : '-'}
                   </td>
-                  <td className="px-6 py-4 text-sm font-bold text-green-600">${booking.rate}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-green-600">${booking.rate || 0}</td>
                   <td className="px-6 py-4 text-sm">
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
                       {booking.status}

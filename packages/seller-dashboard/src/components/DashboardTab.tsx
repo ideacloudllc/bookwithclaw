@@ -1,8 +1,21 @@
 import { useApi } from '../hooks/useApi';
 import { StatCard } from './StatCard';
+import { Room, Offer, Booking } from '../types';
 
 export const DashboardTab = ({ onNavigate }: { onNavigate: (tab: string) => void }) => {
-  const { loading } = useApi('/api/sellers/profile');
+  const { data: rooms, loading: roomsLoading } = useApi<Room[]>('/api/sellers/rooms');
+  const { data: offers, loading: offersLoading } = useApi<Offer[]>('/api/sellers/offers');
+  const { data: bookings, loading: bookingsLoading } = useApi<Booking[]>('/api/sellers/bookings');
+
+  const loading = roomsLoading || offersLoading || bookingsLoading;
+
+  // Calculate stats
+  const activeListings = rooms?.length || 0;
+  const pendingOffers = offers?.filter((o: any) => o.status === 'pending').length || 0;
+  const revenue = bookings?.reduce((sum: number, b: any) => sum + (b.final_price || 0), 0) || 0;
+  const occupancyRate = activeListings > 0 
+    ? Math.round((bookings?.length || 0) / activeListings * 100) 
+    : 0;
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading dashboard...</div>;
@@ -11,10 +24,30 @@ export const DashboardTab = ({ onNavigate }: { onNavigate: (tab: string) => void
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Active Listings" value="12" icon="🏠" color="blue" />
-        <StatCard label="Pending Offers" value="3" icon="💼" color="orange" />
-        <StatCard label="This Month Revenue" value="$4,250" icon="💰" color="green" />
-        <StatCard label="Occupancy Rate" value="78%" icon="📊" color="purple" />
+        <StatCard 
+          label="Active Listings" 
+          value={activeListings.toString()} 
+          icon="🏠" 
+          color="blue" 
+        />
+        <StatCard 
+          label="Pending Offers" 
+          value={pendingOffers.toString()} 
+          icon="💼" 
+          color="orange" 
+        />
+        <StatCard 
+          label="Total Revenue" 
+          value={`$${revenue.toLocaleString()}`} 
+          icon="💰" 
+          color="green" 
+        />
+        <StatCard 
+          label="Occupancy Rate" 
+          value={`${occupancyRate}%`} 
+          icon="📊" 
+          color="purple" 
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -43,21 +76,26 @@ export const DashboardTab = ({ onNavigate }: { onNavigate: (tab: string) => void
           </div>
         </div>
 
-        {/* Recent Activity */}
+        {/* Recent Bookings */}
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-bold mb-4">Recent Bookings</h3>
-          <div className="space-y-3">
-            <div className="border-l-4 border-blue-500 pl-4 py-2">
-              <p className="font-medium text-gray-900">Deluxe Room</p>
-              <p className="text-sm text-gray-500">John Smith • Mar 20-22</p>
-              <p className="text-sm font-bold text-green-600 mt-1">$450</p>
+          {bookings && bookings.length > 0 ? (
+            <div className="space-y-3">
+              {bookings.slice(0, 3).map((booking: any, idx: number) => (
+                <div key={idx} className="border-l-4 border-blue-500 pl-4 py-2">
+                  <p className="font-medium text-gray-900">{booking.room_name || 'Room'}</p>
+                  <p className="text-sm text-gray-500">
+                    {booking.guest_name || 'Guest'} • {booking.checkin_date || 'TBD'}
+                  </p>
+                  <p className="text-sm font-bold text-green-600 mt-1">
+                    ${booking.final_price || booking.agreed_price || 0}
+                  </p>
+                </div>
+              ))}
             </div>
-            <div className="border-l-4 border-blue-500 pl-4 py-2">
-              <p className="font-medium text-gray-900">Standard Room</p>
-              <p className="text-sm text-gray-500">Jane Doe • Mar 25-27</p>
-              <p className="text-sm font-bold text-green-600 mt-1">$300</p>
-            </div>
-          </div>
+          ) : (
+            <p className="text-gray-500 text-center py-6">No bookings yet</p>
+          )}
         </div>
       </div>
     </div>
