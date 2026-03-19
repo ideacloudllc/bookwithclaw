@@ -85,15 +85,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Include routers
+# Include routers (order matters: UI routes must come AFTER API routes to override them)
 app.include_router(landing_router)           # Landing pages (sellers signup, home)
 app.include_router(health_router)            # Health check
 app.include_router(agents_router)            # Agent registration
 app.include_router(seller_dashboard_router)  # Seller dashboard API
-app.include_router(dashboard_ui_router)      # Seller dashboard UI
-app.include_router(buyer_dashboard_router)   # Buyer dashboard API
-app.include_router(buyer_ui_router)          # Buyer dashboard UI
+app.include_router(buyer_dashboard_router)   # Buyer dashboard API (auth-protected)
 app.include_router(sessions_router)          # Negotiation sessions
+app.include_router(dashboard_ui_router)      # Seller dashboard UI (must be after API)
+app.include_router(buyer_ui_router)          # Buyer dashboard UI (must be after API)
 
 
 if __name__ == "__main__":

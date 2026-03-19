@@ -100,7 +100,7 @@ LANDING_HTML = """<!DOCTYPE html>
             }
             
             try {
-                const response = await fetch('/sellers/auth/register', {
+                const response = await fetch('/api/sellers/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password, hotel_name })
@@ -185,7 +185,7 @@ LOGIN_HTML = """<!DOCTYPE html>
             const password = document.getElementById('password').value;
             
             try {
-                const response = await fetch('/sellers/auth/login', {
+                const response = await fetch('/api/sellers/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -373,7 +373,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         async function loadDashboard() {
             try {
                 // Load seller info
-                const meRes = await fetch('/sellers/me', {
+                const meRes = await fetch('/api/sellers/me', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 if (!meRes.ok) throw new Error('Auth failed');
@@ -382,7 +382,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 document.getElementById('sellerEmail').textContent = me.email;
                 
                 // Load dashboard overview
-                const dashRes = await fetch('/sellers/dashboard', {
+                const dashRes = await fetch('/api/sellers/dashboard', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 const dashboard = await dashRes.json();
@@ -437,7 +437,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         // Load rooms
         async function loadRooms() {
             try {
-                const res = await fetch('/sellers/rooms', {
+                const res = await fetch('/api/sellers/rooms', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 const data = await res.json();
@@ -450,7 +450,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         // Load offers
         async function loadOffers() {
             try {
-                const res = await fetch('/sellers/offers', {
+                const res = await fetch('/api/sellers/offers', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 const data = await res.json();
@@ -463,7 +463,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         // Load bookings
         async function loadBookings() {
             try {
-                const res = await fetch('/sellers/bookings', {
+                const res = await fetch('/api/sellers/bookings', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 const data = await res.json();
@@ -661,7 +661,7 @@ BUYER_LANDING_HTML = """<!DOCTYPE html>
             }
 
             try {
-                const response = await fetch('/buyers/auth/register', {
+                const response = await fetch('/api/buyers/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password, first_name })
@@ -670,7 +670,7 @@ BUYER_LANDING_HTML = """<!DOCTYPE html>
                 if (response.ok) {
                     const data = await response.json();
                     document.cookie = `token=${data.token}; path=/; max-age=2592000`;
-                    window.location.href = '/buyers/search';
+                    window.location.href = '/api/buyers/search';
                 } else {
                     const error = await response.json();
                     showError(error.detail || 'Signup failed');
@@ -743,7 +743,7 @@ BUYER_LOGIN_HTML = """<!DOCTYPE html>
             const password = document.getElementById('password').value;
             
             try {
-                const response = await fetch('/buyers/auth/login', {
+                const response = await fetch('/api/buyers/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -752,7 +752,7 @@ BUYER_LOGIN_HTML = """<!DOCTYPE html>
                 if (response.ok) {
                     const data = await response.json();
                     document.cookie = `token=${data.token}; path=/; max-age=2592000`;
-                    window.location.href = '/buyers/search';
+                    window.location.href = '/api/buyers/search';
                 } else {
                     const error = await response.json();
                     showError(error.detail || 'Login failed');
@@ -952,15 +952,15 @@ BUYER_SEARCH_HTML = """<!DOCTYPE html>
         }
         
         function viewRoom(roomId) {
-            window.location.href = '/buyers/rooms/' + roomId;
+            window.location.href = '/api/buyers/rooms/' + roomId;
         }
         
         function goToOffers() {
-            window.location.href = '/buyers/my-offers';
+            window.location.href = '/api/buyers/my-offers';
         }
         
         function goToBookings() {
-            window.location.href = '/buyers/my-bookings';
+            window.location.href = '/api/buyers/my-bookings';
         }
         
         function logout() {
@@ -1040,12 +1040,12 @@ BUYER_ROOM_DETAIL_HTML = """<!DOCTYPE html>
 <body>
     <div class="navbar">
         <div class="logo">🌍 BookWithClaw</div>
-        <a class="back" onclick="window.location.href='/buyers/search'">← Back to Search</a>
+        <a class="back" onclick="window.location.href='/api/buyers/search'">← Back to Search</a>
     </div>
     
     <div class="container">
         <div class="breadcrumb">
-            <a onclick="window.location.href='/buyers/search'">Search</a> → Room Details
+            <a onclick="window.location.href='/api/buyers/search'">Search</a> → Room Details
         </div>
         
         <div class="detail-grid">
@@ -1100,7 +1100,7 @@ BUYER_ROOM_DETAIL_HTML = """<!DOCTYPE html>
                     
                     <div class="buttons">
                         <button class="btn btn-primary" onclick="submitOffer()">Submit Offer</button>
-                        <button class="btn btn-secondary" onclick="window.location.href='/buyers/search'">Cancel</button>
+                        <button class="btn btn-secondary" onclick="window.location.href='/api/buyers/search'">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -1185,7 +1185,7 @@ BUYER_ROOM_DETAIL_HTML = """<!DOCTYPE html>
             }
             
             try {
-                const res = await fetch('/buyers/make-offer', {
+                const res = await fetch('/api/buyers/make-offer', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1201,7 +1201,7 @@ BUYER_ROOM_DETAIL_HTML = """<!DOCTYPE html>
                 
                 if (res.ok) {
                     alert('Offer submitted! View progress in My Offers.');
-                    window.location.href = '/buyers/my-offers';
+                    window.location.href = '/api/buyers/my-offers';
                 } else {
                     alert('Error submitting offer');
                 }
@@ -1304,7 +1304,7 @@ BUYER_OFFERS_HTML = """<!DOCTYPE html>
             }
             
             try {
-                const res = await fetch('/buyers/my-offers', {
+                const res = await fetch('/api/buyers/my-offers', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 const data = await res.json();
@@ -1364,7 +1364,7 @@ BUYER_OFFERS_HTML = """<!DOCTYPE html>
         function counterOffer(offerId) {
             const price = prompt('Enter your counter-offer price:');
             if (price) {
-                fetch('/buyers/offers/' + offerId + '/counter', {
+                fetch('/api/buyers/offers/' + offerId + '/counter', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'cookie': `token=${authToken}` },
                     body: JSON.stringify({ counter_price: parseInt(price) })
@@ -1374,7 +1374,7 @@ BUYER_OFFERS_HTML = """<!DOCTYPE html>
         
         function acceptOffer(offerId) {
             if (confirm('Accept this offer?')) {
-                fetch('/buyers/offers/' + offerId + '/accept', {
+                fetch('/api/buyers/offers/' + offerId + '/accept', {
                     method: 'POST',
                     headers: { 'cookie': `token=${authToken}` }
                 }).then(() => {
@@ -1386,7 +1386,7 @@ BUYER_OFFERS_HTML = """<!DOCTYPE html>
         
         function rejectOffer(offerId) {
             if (confirm('Reject this offer?')) {
-                fetch('/buyers/offers/' + offerId + '/reject', {
+                fetch('/api/buyers/offers/' + offerId + '/reject', {
                     method: 'POST',
                     headers: { 'cookie': `token=${authToken}` }
                 }).then(() => loadOffers());
@@ -1394,11 +1394,11 @@ BUYER_OFFERS_HTML = """<!DOCTYPE html>
         }
         
         function goToSearch() {
-            window.location.href = '/buyers/search';
+            window.location.href = '/api/buyers/search';
         }
         
         function goToBookings() {
-            window.location.href = '/buyers/my-bookings';
+            window.location.href = '/api/buyers/my-bookings';
         }
         
         function logout() {
@@ -1496,7 +1496,7 @@ BUYER_BOOKINGS_HTML = """<!DOCTYPE html>
             }
             
             try {
-                const res = await fetch('/buyers/my-bookings', {
+                const res = await fetch('/api/buyers/my-bookings', {
                     headers: { 'cookie': `token=${authToken}` }
                 });
                 const data = await res.json();
@@ -1551,11 +1551,11 @@ BUYER_BOOKINGS_HTML = """<!DOCTYPE html>
         }
         
         function goToSearch() {
-            window.location.href = '/buyers/search';
+            window.location.href = '/api/buyers/search';
         }
         
         function goToOffers() {
-            window.location.href = '/buyers/my-offers';
+            window.location.href = '/api/buyers/my-offers';
         }
         
         function logout() {

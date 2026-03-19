@@ -13,7 +13,7 @@ from app.dependencies import get_db
 from app.auth import hash_password, verify_password, create_seller_token, verify_seller_token
 from app.models.agent import Agent, AgentRole
 
-router = APIRouter(prefix="/sellers", tags=["seller-dashboard"])
+router = APIRouter(prefix="/api/sellers", tags=["seller-dashboard-api"])
 
 
 # Pydantic models for requests/responses
