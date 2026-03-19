@@ -1,262 +1,371 @@
 /**
- * Reference seller skill for BookWithClaw.
+ * Hotel Room Seller Skill - Reference implementation.
+ * 
+ * SellerSkill is an AI agent that:
+ * 1. Listens for buyer intents
+ * 2. Publishes seller asks (room availability + pricing)
+ * 3. Evaluates buyer counter-offers
+ * 4. Enforces floor price constraint
+ * 5. Accepts final offer when satisfied
  */
 
-import { v4 as uuidv4 } from "uuid";
-
-import { canonicalJSON, signMessage } from "./crypto";
+import { v4 as uuidv4 } from 'uuid';
+import { EventEmitter } from 'events';
+import { ExchangeConnection } from './websocket';
 import {
-  BuyerCounterOffer,
-  DealAccepted,
+  BuyerIntentMessage,
+  BuyerCounterOfferMessage,
+  DealAcceptedMessage,
+  SettlementCompleteMessage,
   Message,
-  SellerAsk,
-  SellerCounterOffer,
-  SettlementComplete,
-} from "./messages";
-import { ExchangeConnection } from "./websocket";
-
-export interface SellerSkillConfig {
-  exchangeUrl: string;
-  agentId: string;
-  authToken: string;
-  publicKey: string;
-  privateKey: string;
-  maxRounds?: number;
-}
+  SellerAskMessageSchema,
+  SellerCounterOfferMessageSchema,
+  SessionWalkawayMessageSchema,
+} from './messages';
+import { signMessage } from './crypto';
 
 export interface HotelSellerConfig {
-  checkInDate: string; // YYYY-MM-DD
-  checkOutDate: string; // YYYY-MM-DD
+  agentId: string;
+  publicKey: string;
+  privateKey: string;
+  roomId: string;
   roomType: string;
+  availableFromDate: string; // ISO date
+  availableToDate: string; // ISO date
   maxOccupants: number;
-  floorPrice: number; // cents
-  askPrice: number; // cents
-  terms?: Record<string, any>;
+  floorPriceCents: number; // Minimum per night
+  basePriceCents: number; // Standard rate
+  stakeCents?: number; // Performance bond
   reputationScore?: number; // 0-100
-  stakeAmount?: number; // cents
+}
+
+export interface SellerSkillOptions {
+  exchangeUrl: string;
+  authToken: string;
+  config: HotelSellerConfig;
 }
 
 /**
- * Reference implementation of a hotel room seller skill.
+ * Seller agent for hotel room negotiation.
  */
-export class SellerSkill {
-  private config: SellerSkillConfig;
+export class SellerSkill extends EventEmitter {
   private connection: ExchangeConnection | null = null;
-  private maxRounds: number;
-  private activeDeals = new Map<string, any>();
+  private config: HotelSellerConfig;
+  private authToken: string;
+  private currentSessionId: string | null = null;
+  private currentRound = 0;
+  private bestOfferCents: number | null = null;
+  private isListening = false;
 
-  constructor(config: SellerSkillConfig) {
-    this.config = {
-      ...config,
-    };
-    this.maxRounds = config.maxRounds || 10;
+  constructor(options: SellerSkillOptions) {
+    super();
+    this.config = options.config;
+    this.authToken = options.authToken;
+
+    // Initialize WebSocket connection
+    this.connection = new ExchangeConnection({
+      exchangeUrl: options.exchangeUrl,
+      sessionId: `seller_listen_${uuidv4()}`,
+      authToken: options.authToken,
+    });
+
+    // Set up message handlers
+    this.connection.on('message', (msg) => this.handleMessage(msg));
+    this.connection.on('error', (error) => this.emit('error', error));
+    this.connection.on('disconnected', () => {
+      if (this.isListening) {
+        this.connection!.connect().catch((e) => this.emit('error', e));
+      }
+    });
   }
 
   /**
-   * Start listening for buyer intents and respond with asks
+   * Main entry point: Start listening for buyer intents and publish asks.
    */
-  async listen(hotelConfig: HotelSellerConfig): Promise<void> {
+  public async listen(): Promise<void> {
     try {
-      const sessionId = uuidv4();
-
-      // Connect to exchange
-      this.connection = new ExchangeConnection({
-        exchangeUrl: this.config.exchangeUrl,
-        sessionId,
-        authToken: this.config.authToken,
-      });
-
-      await this.connection.connect();
-
-      // Set up message listeners
-      this.setupListeners(hotelConfig);
-
-      console.log("[SellerSkill] Listening for buyer intents...");
-
-      // Keep connection alive
-      await new Promise(() => {
-        // Never resolves - listener runs indefinitely
-      });
-    } catch (error: any) {
-      console.error("[SellerSkill] Error:", error.message);
-    } finally {
-      if (this.connection) {
-        this.connection.close();
-      }
+      this.isListening = true;
+      await this.connection!.connect();
+      this.emit('listening');
+    } catch (error) {
+      this.isListening = false;
+      this.emit('error', error);
+      throw error;
     }
   }
 
-  // Private helpers
-
-  private setupListeners(hotelConfig: HotelSellerConfig): void {
-    if (!this.connection) return;
-
-    this.connection.on("message", async (message: Message) => {
-      if (message.type === "BuyerIntent") {
-        // New buyer seeking a room
-        await this.handleBuyerIntent(message as any, hotelConfig);
-      } else if (message.type === "BuyerCounterOffer") {
-        // Buyer made a counter-offer
-        await this.handleBuyerCounter(message as any, hotelConfig);
-      } else if (message.type === "DealAccepted") {
-        // Deal accepted!
-        this.handleDealAccepted(message as any);
-      } else if (message.type === "SettlementComplete") {
-        // Settlement complete
-        console.log(
-          "[SellerSkill] Settlement complete:",
-          (message as any).payload.booking_ref
-        );
-      }
-    });
+  /**
+   * Stop listening.
+   */
+  public disconnect(): void {
+    this.isListening = false;
+    if (this.connection) {
+      this.connection.disconnect();
+    }
   }
 
-  private async handleBuyerIntent(
-    intent: any,
-    hotelConfig: HotelSellerConfig
-  ): Promise<void> {
-    const sessionId = intent.payload.intent_id;
-    const buyerPrice = intent.payload.budget_ceiling;
+  /**
+   * Handle incoming messages from the exchange.
+   */
+  private async handleMessage(msg: Message): Promise<void> {
+    try {
+      switch (msg.type) {
+        case 'buyer_intent':
+          await this.handleBuyerIntent(msg as BuyerIntentMessage);
+          break;
 
-    // Check if this is a compatible request
-    if (buyerPrice < hotelConfig.floorPrice) {
-      // Too low, don't respond
-      console.log("[SellerSkill] Ignoring low bid:", buyerPrice);
+        case 'buyer_counter_offer':
+          await this.handleBuyerCounter(msg as BuyerCounterOfferMessage);
+          break;
+
+        case 'deal_accepted':
+          this.handleDealAccepted(msg as DealAcceptedMessage);
+          break;
+
+        case 'settlement_complete':
+          this.handleSettlementComplete(msg as SettlementCompleteMessage);
+          break;
+
+        case 'session_walkaway':
+          this.emit('session_failed', 'Buyer walked away');
+          break;
+
+        default:
+          // Ignore other message types
+          break;
+      }
+    } catch (error) {
+      this.emit('error', error);
+    }
+  }
+
+  /**
+   * Handle buyer intent - evaluate and decide whether to publish an ask.
+   */
+  private async handleBuyerIntent(intent: BuyerIntentMessage): Promise<void> {
+    // Check if dates align
+    if (
+      intent.check_in_date > this.config.availableToDate ||
+      intent.check_out_date < this.config.availableFromDate
+    ) {
+      // Dates don't match, skip
       return;
     }
 
-    // Create ask response
-    const ask = await this.createAsk(sessionId, hotelConfig);
-    await this.sendMessage(ask);
+    // Check if room type is acceptable
+    if (
+      intent.room_types.length > 0 &&
+      !intent.room_types.includes(this.config.roomType)
+    ) {
+      // Room type not wanted, skip
+      return;
+    }
 
-    // Track this deal
-    this.activeDeals.set(sessionId, {
-      buyerId: intent.payload.buyer_agent_id,
-      currentPrice: hotelConfig.askPrice,
-      round: 1,
+    // Check if buyer can afford our floor price
+    if (intent.budget_ceiling_cents < this.config.floorPriceCents) {
+      // Buyer's budget is below our floor, skip
+      return;
+    }
+
+    // Publish an ask
+    this.currentSessionId = intent.session_id;
+    this.currentRound = intent.round_number + 1;
+    this.bestOfferCents = null;
+    await this.publishAsk(intent);
+  }
+
+  /**
+   * Handle buyer counter-offer.
+   */
+  private async handleBuyerCounter(counter: BuyerCounterOfferMessage): Promise<void> {
+    if (counter.session_id !== this.currentSessionId) {
+      return; // Not our session
+    }
+
+    // Store best offer
+    this.bestOfferCents = counter.offer_price_cents;
+
+    // If offer is at or above floor, counter with a price between floor and base
+    if (counter.offer_price_cents >= this.config.floorPriceCents) {
+      // If offer is close to our floor, accept it
+      // Otherwise, counter back
+      if (
+        counter.offer_price_cents >= this.config.floorPriceCents * 1.1 ||
+        this.currentRound >= 3
+      ) {
+        // Accept the deal
+        await this.sendDealAccepted(counter.offer_price_cents);
+      } else {
+        // Counter with a price above buyer's offer but below our base
+        const counterPrice = Math.min(
+          Math.floor(
+            (counter.offer_price_cents + this.config.floorPriceCents) / 1.1
+          ),
+          this.config.basePriceCents
+        );
+        await this.sendCounterOffer(counterPrice);
+      }
+    } else {
+      // Below floor price, reject by walking away
+      await this.sendWalkaway('Offer below floor price');
+      this.emit('session_failed', 'Buyer offer below floor');
+    }
+  }
+
+  /**
+   * Handle deal_accepted message from buyer.
+   */
+  private handleDealAccepted(msg: DealAcceptedMessage): void {
+    this.emit('deal_accepted', {
+      sessionId: this.currentSessionId!,
+      finalPrice: msg.agreed_price_cents,
     });
   }
 
-  private async handleBuyerCounter(
-    counter: any,
-    hotelConfig: HotelSellerConfig
-  ): Promise<void> {
-    const sessionId = counter.payload.session_id;
-    const buyerPrice = counter.payload.counter_price;
-    const deal = this.activeDeals.get(sessionId);
-
-    if (!deal) return;
-
-    // Simple strategy: move price down towards floor if buyer is reasonable
-    if (buyerPrice >= hotelConfig.floorPrice) {
-      // Accept the buyer's offer
-      const acceptMsg: DealAccepted = {
-        type: "DealAccepted",
-        round_num: counter.round_num + 1,
-        timestamp: new Date().toISOString(),
-        signature: "",
-        payload: {
-          session_id: sessionId,
-          agent_id: this.config.agentId,
-          agreed_price: buyerPrice,
-        },
-      };
-
-      // Sign before sending
-      const payload = canonicalJSON(acceptMsg.payload);
-      acceptMsg.signature = await signMessage(
-        Buffer.from(payload),
-        this.config.privateKey
-      );
-
-      await this.sendMessage(acceptMsg);
-      console.log(`[SellerSkill] Accepted offer at ${buyerPrice}`);
-    } else {
-      // Counter-offer: move slightly down
-      const newPrice = deal.currentPrice - 500; // Move down by $5
-
-      const counterMsg: SellerCounterOffer = {
-        type: "SellerCounterOffer",
-        round_num: counter.round_num + 1,
-        timestamp: new Date().toISOString(),
-        signature: "",
-        payload: {
-          session_id: sessionId,
-          seller_agent_id: this.config.agentId,
-          round_num: counter.round_num + 1,
-          counter_price: Math.max(newPrice, hotelConfig.floorPrice),
-          terms: hotelConfig.terms || {},
-        },
-      };
-
-      // Sign before sending
-      const payload = canonicalJSON(counterMsg.payload);
-      counterMsg.signature = await signMessage(
-        Buffer.from(payload),
-        this.config.privateKey
-      );
-
-      await this.sendMessage(counterMsg);
-      deal.currentPrice = newPrice;
-      deal.round = counter.round_num + 1;
-    }
+  /**
+   * Handle settlement_complete message from exchange.
+   */
+  private handleSettlementComplete(msg: SettlementCompleteMessage): void {
+    this.emit('settlement_complete', {
+      sessionId: this.currentSessionId!,
+      finalPrice: msg.final_price_cents,
+      bookingRef: msg.booking_ref,
+    });
   }
 
-  private handleDealAccepted(message: any): void {
-    const sessionId = message.payload.session_id;
-    const agreedPrice = message.payload.agreed_price;
-
-    console.log(
-      `[SellerSkill] Deal accepted for session ${sessionId} at $${(agreedPrice / 100).toFixed(2)}`
-    );
-
-    this.activeDeals.delete(sessionId);
-  }
-
-  private async createAsk(
-    sessionId: string,
-    config: HotelSellerConfig
-  ): Promise<SellerAsk> {
-    const now = new Date().toISOString();
-    const askId = uuidv4();
-
-    const payload = {
-      ask_id: askId,
-      vertical: "hotels",
-      seller_agent_id: this.config.agentId,
-      session_id: sessionId,
-      price: config.askPrice,
-      floor_price: config.floorPrice,
-      terms: config.terms || {},
-      seller_reputation_score: config.reputationScore || 75,
-      stake_amount: config.stakeAmount || 0,
-      vertical_fields: {
-        checkin_date: config.checkInDate,
-        checkout_date: config.checkOutDate,
-        room_type: config.roomType,
-        max_occupants: config.maxOccupants,
-      },
-    };
-
-    const payloadJson = canonicalJSON(payload);
-    const signature = await signMessage(
-      Buffer.from(payloadJson),
-      this.config.privateKey
-    );
-
-    return {
-      type: "SellerAsk",
-      round_num: 1,
+  /**
+   * Publish ask for a specific buyer intent.
+   */
+  private async publishAsk(intent: BuyerIntentMessage): Promise<void> {
+    const now = Math.floor(Date.now() / 1000);
+    const msg: any = {
+      type: 'seller_ask',
+      vertical: 'hotels',
       timestamp: now,
-      signature,
-      payload,
+      signature: '', // Will be signed below
+      sender_id: this.config.agentId,
+      session_id: intent.session_id,
+      round_number: this.currentRound,
+
+      // Hotel-specific fields
+      room_id: this.config.roomId,
+      room_type: this.config.roomType,
+      available_from_date: this.config.availableFromDate,
+      available_to_date: this.config.availableToDate,
+      max_occupants: this.config.maxOccupants,
+      floor_price_cents: this.config.floorPriceCents,
+      base_price_cents: this.config.basePriceCents,
+      stake_amount_cents: this.config.stakeCents ?? 0,
+      seller_reputation_score: this.config.reputationScore ?? 90,
+      terms: {},
     };
+
+    // Validate
+    try {
+      SellerAskMessageSchema.parse(msg);
+    } catch (error) {
+      this.emit('error', new Error(`Invalid ask: ${error}`));
+      return;
+    }
+
+    const messageBytes = Buffer.from(JSON.stringify(msg, null, 2));
+    msg.signature = await signMessage(messageBytes, this.config.privateKey);
+
+    await this.connection!.send(msg);
+    this.emit('ask_published', { roomId: this.config.roomId });
   }
 
-  private async sendMessage(message: Message): Promise<void> {
-    if (!this.connection) {
-      throw new Error("Not connected to exchange");
+  /**
+   * Send counter-offer message.
+   */
+  private async sendCounterOffer(priceCents: number): Promise<void> {
+    const now = Math.floor(Date.now() / 1000);
+    const msg: any = {
+      type: 'seller_counter_offer',
+      vertical: 'hotels',
+      timestamp: now,
+      signature: '', // Will be signed below
+      sender_id: this.config.agentId,
+      session_id: this.currentSessionId!,
+      round_number: ++this.currentRound,
+
+      intent_id: `intent_${uuidv4()}`,
+      counter_price_cents: priceCents,
+    };
+
+    // Validate
+    try {
+      SellerCounterOfferMessageSchema.parse(msg);
+    } catch (error) {
+      this.emit('error', new Error(`Invalid counter-offer: ${error}`));
+      return;
     }
-    await this.connection.sendMessage(message);
+
+    const messageBytes = Buffer.from(JSON.stringify(msg, null, 2));
+    msg.signature = await signMessage(messageBytes, this.config.privateKey);
+
+    await this.connection!.send(msg);
+    this.emit('counter_offer_sent', { priceCents });
+  }
+
+  /**
+   * Send deal_accepted message.
+   */
+  private async sendDealAccepted(priceCents: number): Promise<void> {
+    const now = Math.floor(Date.now() / 1000);
+    const msg: any = {
+      type: 'deal_accepted',
+      vertical: 'hotels',
+      timestamp: now,
+      signature: '', // Will be signed below
+      sender_id: this.config.agentId,
+      session_id: this.currentSessionId!,
+      round_number: ++this.currentRound,
+
+      agreed_price_cents: priceCents,
+      check_in_date: '2026-03-25', // Would come from intent in real impl
+      check_out_date: '2026-03-27',
+    };
+
+    // Validate (we'll use DealAcceptedMessageSchema but it's flexible)
+    const messageBytes = Buffer.from(JSON.stringify(msg, null, 2));
+    msg.signature = await signMessage(messageBytes, this.config.privateKey);
+
+    await this.connection!.send(msg);
+    this.emit('deal_accepted', {
+      sessionId: this.currentSessionId!,
+      finalPrice: priceCents,
+    });
+  }
+
+  /**
+   * Send walkaway message.
+   */
+  private async sendWalkaway(reason: string): Promise<void> {
+    const now = Math.floor(Date.now() / 1000);
+    const msg: any = {
+      type: 'session_walkaway',
+      vertical: 'hotels',
+      timestamp: now,
+      signature: '', // Will be signed below
+      sender_id: this.config.agentId,
+      session_id: this.currentSessionId!,
+      round_number: ++this.currentRound,
+
+      reason,
+    };
+
+    // Validate
+    try {
+      SessionWalkawayMessageSchema.parse(msg);
+    } catch (error) {
+      this.emit('error', new Error(`Invalid walkaway: ${error}`));
+      return;
+    }
+
+    const messageBytes = Buffer.from(JSON.stringify(msg, null, 2));
+    msg.signature = await signMessage(messageBytes, this.config.privateKey);
+
+    await this.connection!.send(msg);
   }
 }

@@ -1,24 +1,18 @@
 {
   "name": "@bookwithclaw/skill-sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for building BookWithClaw skills",
+  "description": "BookWithClaw agent negotiation skills SDK - TypeScript reference implementation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "test": "vitest",
-    "test:watch": "vitest --watch",
-    "lint": "eslint src --ext .ts",
-    "format": "prettier --write 'src/**/*.ts'"
+    "test:ui": "vitest --ui",
+    "clean": "rm -rf dist"
   },
-  "keywords": [
-    "bookwithclaw",
-    "agent",
-    "negotiation",
-    "exchange"
-  ],
-  "author": "BookWithClaw Team",
-  "license": "TBD",
+  "keywords": ["bookwithclaw", "agent", "negotiation", "skills"],
+  "author": "BookWithClaw",
+  "license": "MIT",
   "dependencies": {
     "@noble/ed25519": "^2.1.0",
     "ws": "^8.18.0",
@@ -30,6 +24,6 @@
     "vitest": "^2.1.0",
     "@types/ws": "^8.5.0",
     "@types/uuid": "^10.0.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^20.10.0"
   }
 }

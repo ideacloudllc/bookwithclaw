@@ -1,58 +1,49 @@
 /**
- * BookWithClaw Skill SDK
- *
- * Public API for building autonomous agent skills that connect to the BookWithClaw Exchange.
+ * BookWithClaw Skill SDK - Public API
+ * 
+ * Reference implementations for Hotel Room Buyer and Seller skills.
  */
 
 // Crypto utilities
-export { generateKeypair, signMessage, verifySignature, canonicalJSON } from "./crypto";
+export { generateKeypair, signMessage, verifySignature, getPublicKey } from './crypto';
 
 // Message types and schemas
 export {
-  BaseMessage,
-  BuyerIntent,
-  BuyerIntentSchema,
-  SellerAsk,
-  SellerAskSchema,
-  BuyerCounterOffer,
-  BuyerCounterOfferSchema,
-  SellerCounterOffer,
-  SellerCounterOfferSchema,
-  DealAccepted,
-  DealAcceptedSchema,
-  SessionWalkaway,
-  SessionWalkawaySchema,
-  SettlementComplete,
-  SettlementCompleteSchema,
-  SettlementFailed,
-  SettlementFailedSchema,
   Message,
-  MessageSchema,
+  BuyerIntentMessage,
+  SellerAskMessage,
+  BuyerCounterOfferMessage,
+  SellerCounterOfferMessage,
+  DealAcceptedMessage,
+  SessionWalkawayMessage,
+  SettlementCompleteMessage,
   parseMessage,
-} from "./messages";
+  BuyerIntentMessageSchema,
+  SellerAskMessageSchema,
+  BuyerCounterOfferMessageSchema,
+  SellerCounterOfferMessageSchema,
+  DealAcceptedMessageSchema,
+  SessionWalkawayMessageSchema,
+  SettlementCompleteMessageSchema,
+} from './messages';
 
-// Vertical schemas
+// WebSocket connection manager
 export {
-  HotelBuyerIntent,
-  HotelBuyerIntentSchema,
-  HotelSellerAsk,
-  HotelSellerAskSchema,
-  validateHotelCompatibility,
-} from "./schemas/hotels";
+  ExchangeConnection,
+  type ExchangeConnectionOptions,
+} from './websocket';
 
-// WebSocket connection
-export { ExchangeConnection, ExchangeConnectionOptions } from "./websocket";
-
-// Reference skill implementations
+// Buyer skill
 export {
   BuyerSkill,
-  BuyerSkillConfig,
-  HotelBuyerConfig,
-  SkillResult,
-} from "./buyer-skill";
+  type HotelBuyerConfig,
+  type BuyerSkillOptions,
+  type SessionResult,
+} from './buyer-skill';
 
+// Seller skill
 export {
   SellerSkill,
-  SellerSkillConfig,
-  HotelSellerConfig,
-} from "./seller-skill";
+  type HotelSellerConfig,
+  type SellerSkillOptions,
+} from './seller-skill';

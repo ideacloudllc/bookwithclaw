@@ -1,75 +1,142 @@
 /**
- * WebSocket connection manager for BookWithClaw Exchange.
+ * WebSocket connection manager for connecting skills to the exchange.
+ * 
+ * Handles:
+ * - Connection lifecycle
+ * - Auto-reconnect with exponential backoff
+ * - Message sending/receiving
+ * - Event emission
  */
 
-import { EventEmitter } from "events";
-import { WebSocket } from "ws";
-
-import { Message, MessageSchema, parseMessage } from "./messages";
+import { EventEmitter } from 'events';
+import WebSocket from 'ws';
+import { Message, parseMessage } from './messages';
 
 export interface ExchangeConnectionOptions {
   exchangeUrl: string;
   sessionId: string;
   authToken: string;
-  reconnectMaxRetries?: number;
-  reconnectDelay?: number;
+  maxRetries?: number;
 }
 
 /**
- * Manages WebSocket connection to BookWithClaw Exchange.
+ * ExchangeConnection manages WebSocket connection to the exchange.
+ * 
+ * Events:
+ * - 'connected' - Connection established
+ * - 'disconnected' - Connection lost
+ * - 'message' - Message received
+ * - 'error' - Error occurred
  */
 export class ExchangeConnection extends EventEmitter {
   private ws: WebSocket | null = null;
-  private options: ExchangeConnectionOptions & {
-    reconnectMaxRetries: number;
-    reconnectDelay: number;
-  };
-  private reconnectAttempts = 0;
-  private messageQueue: Message[] = [];
+  private url: string;
+  private authToken: string;
+  private isConnecting = false;
+  private retryCount = 0;
+  private maxRetries: number;
+  private lastBackoffMs = 1000;
 
   constructor(options: ExchangeConnectionOptions) {
     super();
-    this.options = {
-      ...options,
-      reconnectMaxRetries: options.reconnectMaxRetries || 5,
-      reconnectDelay: options.reconnectDelay || 1000,
-    };
+    
+    this.url = `${options.exchangeUrl}/ws/session/${options.sessionId}`;
+    this.authToken = options.authToken;
+    this.maxRetries = options.maxRetries ?? 5;
   }
 
   /**
-   * Connect to the exchange
+   * Connect to the exchange WebSocket.
+   * 
+   * @returns Promise that resolves when connected
    */
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const url = this.buildWebSocketUrl();
+  public async connect(): Promise<void> {
+    if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
+      return;
+    }
 
-      try {
-        this.ws = new WebSocket(url);
+    this.isConnecting = true;
 
-        this.ws.onopen = () => {
-          console.log(`Connected to exchange: ${url}`);
-          this.reconnectAttempts = 0;
-          this.emit("connected");
-          this.flushMessageQueue();
+    try {
+      return await new Promise((resolve, reject) => {
+        // Use token in URL since browsers don't allow custom headers in WebSocket
+        const urlWithAuth = `${this.url}?token=${encodeURIComponent(this.authToken)}`;
+        
+        this.ws = new WebSocket(urlWithAuth);
+
+        this.ws.addEventListener('open', () => {
+          this.isConnecting = false;
+          this.retryCount = 0;
+          this.lastBackoffMs = 1000;
+          this.emit('connected');
           resolve();
-        };
+        });
 
-        this.ws.onmessage = (event) => {
-          const data = typeof event.data === 'string' ? event.data : event.data.toString();
-          this.handleMessage(data);
-        };
+        this.ws.addEventListener('message', (event) => {
+          const message = parseMessage(event.data);
+          if (message) {
+            this.emit('message', message);
+          }
+        });
 
-        this.ws.onerror = (error) => {
-          console.error("WebSocket error:", error);
-          this.emit("error", error);
-          reject(error);
-        };
-
-        this.ws.onclose = () => {
-          console.log("Disconnected from exchange");
-          this.emit("disconnected");
+        this.ws.addEventListener('close', () => {
+          this.isConnecting = false;
+          this.emit('disconnected');
           this.attemptReconnect();
-        };
+        });
+
+        this.ws.addEventListener('error', (event) => {
+          this.emit('error', new Error(`WebSocket error: ${event}`));
+          reject(new Error(`Failed to connect: ${event}`));
+        });
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          if (this.isConnecting && this.ws?.readyState !== WebSocket.OPEN) {
+            this.ws?.close();
+            reject(new Error('Connection timeout'));
+          }
+        }, 10000);
+      });
+    } catch (error) {
+      this.isConnecting = false;
+      throw error;
+    }
+  }
+
+  /**
+   * Disconnect from the exchange.
+   */
+  public disconnect(): void {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.isConnecting = false;
+    this.retryCount = 0;
+  }
+
+  /**
+   * Send a message to the exchange.
+   * 
+   * @param message - Message to send
+   * @returns Promise that resolves when sent
+   */
+  public async send(message: Message): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket is not connected');
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const json = JSON.stringify(message);
+        this.ws!.send(json, (error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
       } catch (error) {
         reject(error);
       }
@@ -77,89 +144,29 @@ export class ExchangeConnection extends EventEmitter {
   }
 
   /**
-   * Send a message to the exchange
+   * Check if connected.
    */
-  async sendMessage(message: Message): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      // Queue message if not connected
-      this.messageQueue.push(message);
-      if (!this.ws) {
-        await this.connect();
-      }
-      return;
-    }
-
-    const json = JSON.stringify(message);
-    this.ws.send(json);
-    this.emit("sent", message);
-  }
-
-  /**
-   * Close the connection
-   */
-  close(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-
-  /**
-   * Check if connected
-   */
-  isConnected(): boolean {
+  public isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
-  // Private helpers
-
-  private buildWebSocketUrl(): string {
-    const baseUrl = this.options.exchangeUrl.replace(/\/$/, "");
-    const sessionId = this.options.sessionId;
-    const token = this.options.authToken;
-
-    return `${baseUrl}/ws/session/${sessionId}?token=${encodeURIComponent(token)}`;
-  }
-
-  private handleMessage(data: string): void {
-    try {
-      const parsed = JSON.parse(data);
-      const message = parseMessage(parsed);
-      this.emit("message", message);
-    } catch (error) {
-      console.error("Failed to parse message:", error, "data:", data);
-      this.emit("error", error);
-    }
-  }
-
-  private flushMessageQueue(): void {
-    while (this.messageQueue.length > 0 && this.isConnected()) {
-      const message = this.messageQueue.shift()!;
-      const json = JSON.stringify(message);
-      if (this.ws) {
-        this.ws.send(json);
-        this.emit("sent", message);
-      }
-    }
-  }
-
+  /**
+   * Attempt to reconnect with exponential backoff.
+   */
   private attemptReconnect(): void {
-    if (this.reconnectAttempts >= this.options.reconnectMaxRetries) {
-      console.error("Max reconnect attempts reached");
-      this.emit("reconnect_failed");
+    if (this.retryCount >= this.maxRetries) {
+      this.emit('error', new Error(`Max retries (${this.maxRetries}) exceeded`));
       return;
     }
 
-    this.reconnectAttempts++;
-    const delay =
-      this.options.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.options.reconnectMaxRetries}) in ${delay}ms...`);
+    this.retryCount++;
+    const delayMs = Math.min(this.lastBackoffMs * 2, 30000); // Cap at 30 seconds
+    this.lastBackoffMs = delayMs;
 
     setTimeout(() => {
       this.connect().catch((error) => {
-        console.error("Reconnect failed:", error);
+        this.emit('error', error);
       });
-    }, delay);
+    }, delayMs);
   }
 }

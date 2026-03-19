@@ -1,171 +1,185 @@
 /**
- * Message type definitions for BookWithClaw Exchange.
- * All message schemas use Zod for runtime validation.
+ * Message type definitions and Zod schemas for agent-to-agent communication.
+ * 
+ * All messages must:
+ * 1. Include signature (Ed25519 hex)
+ * 2. Include timestamp
+ * 3. Include type identifier
+ * 4. Be JSON-serializable
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
-/**
- * Base message schema (shared by all message types)
- */
-const BaseMessage = z.object({
+// ===== Base Message Schema =====
+
+export const BaseMessageSchema = z.object({
   type: z.string(),
-  round_num: z.number().int().positive(),
-  timestamp: z.string().datetime(),
-  signature: z.string().length(128), // 64-byte sig in hex
-  payload: z.record(z.any()),
+  timestamp: z.number().int().positive(),
+  signature: z.string().hex(),
+  sender_id: z.string(),
+  session_id: z.string(),
+  round_number: z.number().int().nonnegative(),
 });
 
-export type BaseMessage = z.infer<typeof BaseMessage>;
+// ===== Hotel Vertical Messages =====
 
 /**
- * BUYER INTENT — Buyer announces availability and preferences
+ * BUYER INTENT: Buyer announces what they're looking for.
+ * State: OPEN → MATCHING
  */
-export const BuyerIntentSchema = BaseMessage.extend({
-  type: z.literal("BuyerIntent"),
-  payload: z.object({
-    intent_id: z.string().uuid(),
-    vertical: z.string(),
-    buyer_agent_id: z.string().uuid(),
-    budget_ceiling: z.number().int().positive(), // in cents
-    max_negotiation_rounds: z.number().int().positive(),
-    preferred_terms: z.record(z.any()).optional(),
-    vertical_fields: z.record(z.any()), // e.g., hotels: checkin, checkout, room_type
-  }),
+export const BuyerIntentMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('buyer_intent'),
+  vertical: z.literal('hotels'),
+  
+  // Hotel-specific fields
+  check_in_date: z.string().date(),
+  check_out_date: z.string().date(),
+  budget_ceiling_cents: z.number().int().positive(), // Max cents willing to pay per night
+  occupants: z.number().int().min(1),
+  room_types: z.array(z.string()).min(1), // ["deluxe_king", "standard_queen"]
+  preferred_terms: z.record(z.string(), z.any()).optional(),
 });
 
-export type BuyerIntent = z.infer<typeof BuyerIntentSchema>;
+export type BuyerIntentMessage = z.infer<typeof BuyerIntentMessageSchema>;
 
 /**
- * SELLER ASK — Seller offers availability and pricing
+ * SELLER ASK: Seller publishes what they're offering.
+ * State: OPEN → MATCHING
  */
-export const SellerAskSchema = BaseMessage.extend({
-  type: z.literal("SellerAsk"),
-  payload: z.object({
-    ask_id: z.string().uuid(),
-    vertical: z.string(),
-    seller_agent_id: z.string().uuid(),
-    session_id: z.string().uuid(),
-    price: z.number().int().nonnegative(), // in cents
-    floor_price: z.number().int().nonnegative(),
-    terms: z.record(z.any()).optional(),
-    seller_reputation_score: z.number().int().min(0).max(100),
-    stake_amount: z.number().int().nonnegative(),
-    vertical_fields: z.record(z.any()),
-  }),
+export const SellerAskMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('seller_ask'),
+  vertical: z.literal('hotels'),
+  
+  // Hotel-specific fields
+  room_id: z.string(),
+  room_type: z.string(),
+  available_from_date: z.string().date(),
+  available_to_date: z.string().date(),
+  max_occupants: z.number().int().min(1),
+  floor_price_cents: z.number().int().nonnegative(), // Minimum per night
+  base_price_cents: z.number().int().positive(), // Standard rate
+  stake_amount_cents: z.number().int().nonnegative(), // Performance bond
+  seller_reputation_score: z.number().int().min(0).max(100),
+  terms: z.record(z.string(), z.any()).optional(),
 });
 
-export type SellerAsk = z.infer<typeof SellerAskSchema>;
+export type SellerAskMessage = z.infer<typeof SellerAskMessageSchema>;
 
 /**
- * BUYER COUNTER-OFFER — Buyer adjusts price/terms
+ * BUYER COUNTER-OFFER: Buyer responds to ask with counter price.
+ * State: NEGOTIATING
  */
-export const BuyerCounterOfferSchema = BaseMessage.extend({
-  type: z.literal("BuyerCounterOffer"),
-  payload: z.object({
-    session_id: z.string().uuid(),
-    buyer_agent_id: z.string().uuid(),
-    round_num: z.number().int().positive(),
-    counter_price: z.number().int().positive(),
-    preferred_terms: z.record(z.any()).optional(),
-  }),
+export const BuyerCounterOfferMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('buyer_counter_offer'),
+  vertical: z.literal('hotels'),
+  
+  ask_id: z.string(),
+  offer_price_cents: z.number().int().positive(),
 });
 
-export type BuyerCounterOffer = z.infer<typeof BuyerCounterOfferSchema>;
+export type BuyerCounterOfferMessage = z.infer<typeof BuyerCounterOfferMessageSchema>;
 
 /**
- * SELLER COUNTER-OFFER — Seller adjusts price/terms
+ * SELLER COUNTER-OFFER: Seller responds to buyer counter.
+ * State: NEGOTIATING
  */
-export const SellerCounterOfferSchema = BaseMessage.extend({
-  type: z.literal("SellerCounterOffer"),
-  payload: z.object({
-    session_id: z.string().uuid(),
-    seller_agent_id: z.string().uuid(),
-    round_num: z.number().int().positive(),
-    counter_price: z.number().int().positive(),
-    terms: z.record(z.any()).optional(),
-  }),
+export const SellerCounterOfferMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('seller_counter_offer'),
+  vertical: z.literal('hotels'),
+  
+  intent_id: z.string(),
+  counter_price_cents: z.number().int().positive(),
 });
 
-export type SellerCounterOffer = z.infer<typeof SellerCounterOfferSchema>;
+export type SellerCounterOfferMessage = z.infer<typeof SellerCounterOfferMessageSchema>;
 
 /**
- * DEAL ACCEPTED — Either party accepts the current offer
+ * DEAL ACCEPTED: Either party accepts the final offer.
+ * State: NEGOTIATING → AGREED
  */
-export const DealAcceptedSchema = BaseMessage.extend({
-  type: z.literal("DealAccepted"),
-  payload: z.object({
-    session_id: z.string().uuid(),
-    agent_id: z.string().uuid(),
-    agreed_price: z.number().int().positive(),
-  }),
+export const DealAcceptedMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('deal_accepted'),
+  vertical: z.literal('hotels'),
+  
+  agreed_price_cents: z.number().int().positive(),
+  check_in_date: z.string().date(),
+  check_out_date: z.string().date(),
 });
 
-export type DealAccepted = z.infer<typeof DealAcceptedSchema>;
+export type DealAcceptedMessage = z.infer<typeof DealAcceptedMessageSchema>;
 
 /**
- * SESSION WALKAWAY — Agent abandons negotiation
+ * SESSION WALKAWAY: Either party abandons negotiation.
+ * State: NEGOTIATING → FAILED
  */
-export const SessionWalkawaySchema = BaseMessage.extend({
-  type: z.literal("SessionWalkaway"),
-  payload: z.object({
-    session_id: z.string().uuid(),
-    agent_id: z.string().uuid(),
-    reason: z.string(),
-  }),
+export const SessionWalkawayMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('session_walkaway'),
+  vertical: z.literal('hotels'),
+  
+  reason: z.string().optional(),
 });
 
-export type SessionWalkaway = z.infer<typeof SessionWalkawaySchema>;
+export type SessionWalkawayMessage = z.infer<typeof SessionWalkawayMessageSchema>;
 
 /**
- * SETTLEMENT COMPLETE — Both parties notified of settlement
+ * SETTLEMENT COMPLETE: Exchange confirms payment settled and booking complete.
+ * State: SETTLING → COMPLETE
  */
-export const SettlementCompleteSchema = BaseMessage.extend({
-  type: z.literal("SettlementComplete"),
-  payload: z.object({
-    session_id: z.string().uuid(),
-    transaction_id: z.string().uuid(),
-    booking_ref: z.string(),
-    agreed_price: z.number().int().positive(),
-    platform_fee: z.number().int().nonnegative(),
-    payout: z.number().int().nonnegative(), // seller payout in cents
-  }),
+export const SettlementCompleteMessageSchema = BaseMessageSchema.extend({
+  type: z.literal('settlement_complete'),
+  vertical: z.literal('hotels'),
+  
+  transaction_id: z.string(),
+  booking_ref: z.string(),
+  final_price_cents: z.number().int().positive(),
+  check_in_date: z.string().date(),
+  check_out_date: z.string().date(),
 });
 
-export type SettlementComplete = z.infer<typeof SettlementCompleteSchema>;
+export type SettlementCompleteMessage = z.infer<typeof SettlementCompleteMessageSchema>;
 
 /**
- * SETTLEMENT FAILED — Settlement could not be completed
+ * Union type for all messages.
  */
-export const SettlementFailedSchema = BaseMessage.extend({
-  type: z.literal("SettlementFailed"),
-  payload: z.object({
-    session_id: z.string().uuid(),
-    reason: z.string(),
-  }),
-});
-
-export type SettlementFailed = z.infer<typeof SettlementFailedSchema>;
+export type Message =
+  | BuyerIntentMessage
+  | SellerAskMessage
+  | BuyerCounterOfferMessage
+  | SellerCounterOfferMessage
+  | DealAcceptedMessage
+  | SessionWalkawayMessage
+  | SettlementCompleteMessage;
 
 /**
- * Union of all message types
+ * Parse and validate a message from JSON.
+ * 
+ * @param json - Message as JSON string
+ * @returns Parsed message or null if invalid
  */
-export const MessageSchema = z.union([
-  BuyerIntentSchema,
-  SellerAskSchema,
-  BuyerCounterOfferSchema,
-  SellerCounterOfferSchema,
-  DealAcceptedSchema,
-  SessionWalkawaySchema,
-  SettlementCompleteSchema,
-  SettlementFailedSchema,
-]);
-
-export type Message = z.infer<typeof MessageSchema>;
-
-/**
- * Parse and validate a message
- */
-export function parseMessage(data: unknown): Message {
-  return MessageSchema.parse(data);
+export function parseMessage(json: string): Message | null {
+  try {
+    const obj = JSON.parse(json);
+    
+    // Try to parse based on type
+    switch (obj.type) {
+      case 'buyer_intent':
+        return BuyerIntentMessageSchema.parse(obj);
+      case 'seller_ask':
+        return SellerAskMessageSchema.parse(obj);
+      case 'buyer_counter_offer':
+        return BuyerCounterOfferMessageSchema.parse(obj);
+      case 'seller_counter_offer':
+        return SellerCounterOfferMessageSchema.parse(obj);
+      case 'deal_accepted':
+        return DealAcceptedMessageSchema.parse(obj);
+      case 'session_walkaway':
+        return SessionWalkawayMessageSchema.parse(obj);
+      case 'settlement_complete':
+        return SettlementCompleteMessageSchema.parse(obj);
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
 }

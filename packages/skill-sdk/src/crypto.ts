@@ -1,78 +1,68 @@
 /**
- * Ed25519 cryptographic utilities for BookWithClaw skills.
+ * Ed25519 cryptographic utilities for agent message signing and verification.
  */
 
-import * as ed25519 from "@noble/ed25519";
-import { randomBytes } from "crypto";
+import { ed25519 } from '@noble/ed25519';
 
 /**
  * Generate an Ed25519 keypair.
- *
- * @returns {Object} Object with publicKey and privateKey (hex-encoded)
+ * 
+ * @returns Object with { publicKey, privateKey } as hex strings
  */
-export function generateKeypair(): {
-  publicKey: string;
-  privateKey: string;
-} {
-  // Generate 32-byte random private key
-  const privateKeyBytes = randomBytes(32);
-  const privateKey = privateKeyBytes.toString("hex");
-
-  // Derive public key
-  const publicKeyBytes = ed25519.getPublicKey(privateKeyBytes);
-  const publicKey = Buffer.from(publicKeyBytes).toString("hex");
-
-  return { publicKey, privateKey };
+export async function generateKeypair() {
+  const privateKey = ed25519.utils.randomPrivateKey();
+  const publicKey = await ed25519.getPublicKeyAsync(privateKey);
+  
+  return {
+    publicKey: Buffer.from(publicKey).toString('hex'),
+    privateKey: Buffer.from(privateKey).toString('hex'),
+  };
 }
 
 /**
- * Sign a message with an Ed25519 private key.
- *
+ * Sign a message using an Ed25519 private key.
+ * 
  * @param message - Message bytes to sign
- * @param privateKey - Hex-encoded private key
- * @returns Hex-encoded signature
+ * @param privateKey - Private key as hex string
+ * @returns Signature as hex string
  */
-export async function signMessage(
-  message: Buffer | Uint8Array,
-  privateKey: string
-): Promise<string> {
-  const privKeyBytes = Buffer.from(privateKey, "hex");
-  const msgBytes = Buffer.isBuffer(message) ? message : Buffer.from(message);
-
-  const sig = await ed25519.sign(msgBytes, privKeyBytes);
-  return Buffer.from(sig).toString("hex");
+export async function signMessage(message: Buffer, privateKey: string): Promise<string> {
+  const privateKeyBytes = Buffer.from(privateKey, 'hex');
+  const signature = await ed25519.signAsync(message, privateKeyBytes);
+  return Buffer.from(signature).toString('hex');
 }
 
 /**
  * Verify an Ed25519 signature.
- *
- * @param message - Original message bytes
- * @param signature - Hex-encoded signature
- * @param publicKey - Hex-encoded public key
+ * 
+ * @param message - Message bytes that were signed
+ * @param signature - Signature as hex string
+ * @param publicKey - Public key as hex string
  * @returns True if signature is valid, false otherwise
  */
 export async function verifySignature(
-  message: Buffer | Uint8Array,
+  message: Buffer,
   signature: string,
   publicKey: string
 ): Promise<boolean> {
   try {
-    const msgBytes = Buffer.isBuffer(message) ? message : Buffer.from(message);
-    const sigBytes = Buffer.from(signature, "hex");
-    const pubKeyBytes = Buffer.from(publicKey, "hex");
-
-    return await ed25519.verify(sigBytes, msgBytes, pubKeyBytes);
+    const signatureBytes = Buffer.from(signature, 'hex');
+    const publicKeyBytes = Buffer.from(publicKey, 'hex');
+    const isValid = await ed25519.verifyAsync(signatureBytes, message, publicKeyBytes);
+    return isValid;
   } catch {
     return false;
   }
 }
 
 /**
- * Serialize an object to canonical JSON (no spaces, sorted keys).
- *
- * @param obj - Object to serialize
- * @returns JSON string
+ * Extract public key from private key.
+ * 
+ * @param privateKey - Private key as hex string
+ * @returns Public key as hex string
  */
-export function canonicalJSON(obj: Record<string, any>): string {
-  return JSON.stringify(obj, Object.keys(obj).sort());
+export async function getPublicKey(privateKey: string): Promise<string> {
+  const privateKeyBytes = Buffer.from(privateKey, 'hex');
+  const publicKey = await ed25519.getPublicKeyAsync(privateKeyBytes);
+  return Buffer.from(publicKey).toString('hex');
 }
