@@ -1,8 +1,13 @@
 import { useApi } from '../hooks/useApi';
 import { Booking } from '../types';
 
+interface BookingsResponse {
+  bookings?: Booking[];
+}
+
 export const BookingsTab = () => {
-  const { data: bookings, loading } = useApi<Booking[]>('/api/sellers/bookings');
+  const { data: bookingsData, loading } = useApi<BookingsResponse>('/api/sellers/bookings');
+  const bookings = bookingsData?.bookings || [];
 
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading bookings...</div>;

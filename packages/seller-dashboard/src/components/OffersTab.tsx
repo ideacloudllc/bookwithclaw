@@ -5,6 +5,10 @@ import { Offer } from '../types';
 import { Modal } from './Modal';
 import { FormInput } from './FormInput';
 
+interface OffersResponse {
+  offers?: Offer[];
+}
+
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800',
   negotiating: 'bg-blue-100 text-blue-800',
@@ -13,7 +17,8 @@ const statusColors = {
 };
 
 export const OffersTab = () => {
-  const { data: offers, loading, refetch } = useApi<Offer[]>('/api/sellers/offers');
+  const { data: offersData, loading, refetch } = useApi<OffersResponse>('/api/sellers/offers');
+  const offers = offersData?.offers || [];
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [counterPrice, setCounterPrice] = useState('');

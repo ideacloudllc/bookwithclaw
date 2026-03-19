@@ -3,13 +3,24 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Signup } from './pages/Signup';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { getAuthToken } from './utils/auth';
 
 function App() {
+  const isAuthenticated = !!getAuthToken();
+
   return (
     <Router basename="/sellers">
       <Routes>
-        <Route path="/" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
+        {/* If logged in, redirect away from signup/login */}
+        <Route 
+          path="/" 
+          element={isAuthenticated ? <Navigate to="/portal" replace /> : <Signup />} 
+        />
+        <Route 
+          path="/login" 
+          element={isAuthenticated ? <Navigate to="/portal" replace /> : <Login />} 
+        />
+        {/* Protected dashboard */}
         <Route
           path="/portal"
           element={
@@ -18,7 +29,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/portal" : "/"} replace />} />
       </Routes>
     </Router>
   );
