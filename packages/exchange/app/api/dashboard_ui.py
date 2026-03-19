@@ -288,12 +288,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div id="sellerEmail">email@example.com</div>
             </div>
             <ul class="nav">
-                <li><a class="nav-link active" onclick="switchTab('dashboard')">📊 Dashboard</a></li>
-                <li><a class="nav-link" onclick="switchTab('rooms')">🏨 Rooms</a></li>
-                <li><a class="nav-link" onclick="switchTab('offers')">💬 Offers</a></li>
-                <li><a class="nav-link" onclick="switchTab('bookings')">📅 Bookings</a></li>
-                <li><a class="nav-link" onclick="switchTab('pricing')">💰 Pricing</a></li>
-                <li><a class="nav-link" onclick="switchTab('profile')">👤 Profile</a></li>
+                <li><a class="nav-link active" onclick="switchTab(this, 'dashboard')">📊 Dashboard</a></li>
+                <li><a class="nav-link" onclick="switchTab(this, 'rooms')">🏨 Rooms</a></li>
+                <li><a class="nav-link" onclick="switchTab(this, 'offers')">💬 Offers</a></li>
+                <li><a class="nav-link" onclick="switchTab(this, 'bookings')">📅 Bookings</a></li>
+                <li><a class="nav-link" onclick="switchTab(this, 'pricing')">💰 Pricing</a></li>
+                <li><a class="nav-link" onclick="switchTab(this, 'profile')">👤 Profile</a></li>
             </ul>
             <div class="logout">
                 <a onclick="logout()" style="cursor: pointer;">🚪 Logout</a>
@@ -405,10 +405,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         
         // Switch tabs
-        async function switchTab(tab) {
+        async function switchTab(clickedElement, tab) {
             // Update nav links
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-            event.target.classList.add('active');
+            clickedElement.classList.add('active');
             
             // Update page title
             const titles = {
