@@ -477,15 +477,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         function renderRoomsList(rooms) {
             let html = '<div class="data-table"><table><thead><tr><th>Room</th><th>Capacity</th><th>Base Rate</th><th>Floor Price</th><th>Status</th><th>Views</th><th>Bookings</th></tr></thead><tbody>';
             rooms.forEach(room => {
-                html += \`<tr>
-                    <td><strong>\${room.name}</strong></td>
-                    <td>\${room.capacity} guests</td>
-                    <td class="price">$\${room.base_rate}</td>
-                    <td class="price">$\${room.floor_price}</td>
-                    <td><span class="status \${room.status}">\${room.status}</span></td>
-                    <td>\${room.views}</td>
-                    <td>\${room.bookings}</td>
-                </tr>\`;
+                html += '<tr>' +
+                    '<td><strong>' + room.name + '</strong></td>' +
+                    '<td>' + room.capacity + ' guests</td>' +
+                    '<td class="price">$' + room.base_rate + '</td>' +
+                    '<td class="price">$' + room.floor_price + '</td>' +
+                    '<td><span class="status ' + room.status + '">' + room.status + '</span></td>' +
+                    '<td>' + room.views + '</td>' +
+                    '<td>' + room.bookings + '</td>' +
+                    '</tr>';
             });
             html += '</tbody></table></div>';
             document.getElementById('roomsList').innerHTML = html;
@@ -500,13 +500,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             let html = '<div class="data-table"><table><thead><tr><th>Guest</th><th>Room</th><th>Dates</th><th>Offered Price</th><th>Status</th></tr></thead><tbody>';
             offers.forEach(offer => {
                 const nights = offer.nights || 1;
-                html += \`<tr>
-                    <td>\${offer.buyer_name}</td>
-                    <td>\${offer.room_type}</td>
-                    <td>\${offer.checkin} → \${offer.checkout} (\${nights} night\${nights > 1 ? 's' : ''})</td>
-                    <td class="price">$\${offer.offered_price}/night</td>
-                    <td><span class="status \${offer.status}">\${offer.status}</span></td>
-                </tr>\`;
+                const nightsLabel = nights > 1 ? 's' : '';
+                html += '<tr>' +
+                    '<td>' + offer.buyer_name + '</td>' +
+                    '<td>' + offer.room_type + '</td>' +
+                    '<td>' + offer.checkin + ' → ' + offer.checkout + ' (' + nights + ' night' + nightsLabel + ')</td>' +
+                    '<td class="price">$' + offer.offered_price + '/night</td>' +
+                    '<td><span class="status ' + offer.status + '">' + offer.status + '</span></td>' +
+                    '</tr>';
             });
             html += '</tbody></table></div>';
             document.getElementById(containerId).innerHTML = html;
@@ -521,13 +522,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             let html = '<div class="data-table"><table><thead><tr><th>Guest</th><th>Room</th><th>Dates</th><th>Total Revenue</th><th>Status</th></tr></thead><tbody>';
             bookings.forEach(booking => {
                 const nights = booking.nights || 1;
-                html += \`<tr>
-                    <td>\${booking.guest_name}</td>
-                    <td>\${booking.room_type}</td>
-                    <td>\${booking.checkin} → \${booking.checkout} (\${nights} night\${nights > 1 ? 's' : ''})</td>
-                    <td class="price">$\${booking.total}</td>
-                    <td><span class="status \${booking.status}">\${booking.status}</span></td>
-                </tr>\`;
+                const nightsLabel = nights > 1 ? 's' : '';
+                html += '<tr>' +
+                    '<td>' + booking.guest_name + '</td>' +
+                    '<td>' + booking.room_type + '</td>' +
+                    '<td>' + booking.checkin + ' → ' + booking.checkout + ' (' + nights + ' night' + nightsLabel + ')</td>' +
+                    '<td class="price">$' + booking.total + '</td>' +
+                    '<td><span class="status ' + booking.status + '">' + booking.status + '</span></td>' +
+                    '</tr>';
             });
             html += '</tbody></table></div>';
             document.getElementById(containerId).innerHTML = html;
