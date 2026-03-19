@@ -41,8 +41,8 @@ LOGIN_HTML = """<!DOCTYPE html>
                 <input type="email" id="email" name="email" placeholder="your@hotel.com" required>
             </div>
             <div class="form-group">
-                <label for="password">Access Code</label>
-                <input type="password" id="password" name="password" placeholder="Your access code" required>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
             </div>
             <button type="submit">Sign In</button>
             <div class="error" id="error"></div>
@@ -67,7 +67,7 @@ LOGIN_HTML = """<!DOCTYPE html>
                 localStorage.setItem('email', email);
                 window.location.href = '/sellers/portal';
             } else {
-                document.getElementById('error').textContent = 'Invalid email or access code';
+                document.getElementById('error').textContent = 'Invalid email or password';
                 document.getElementById('error').style.display = 'block';
             }
         });
