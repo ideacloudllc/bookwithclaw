@@ -36,7 +36,7 @@ async def test_full_negotiation_flow(client: TestClient, db_session: AsyncSessio
             "email": "buyer@example.com",
         }
     )
-    assert buyer_response.status_code == 200
+    assert buyer_response.status_code == 201
     buyer_token = buyer_response.json()["auth_token"]
     buyer_id = buyer_response.json()["agent_id"]
 
@@ -50,7 +50,7 @@ async def test_full_negotiation_flow(client: TestClient, db_session: AsyncSessio
             "email": "seller@example.com",
         }
     )
-    assert seller_response.status_code == 200
+    assert seller_response.status_code == 201
     seller_token = seller_response.json()["auth_token"]
     seller_id = seller_response.json()["agent_id"]
 

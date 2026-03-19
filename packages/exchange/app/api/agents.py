@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,18 @@ class AgentRegisterRequest(BaseModel):
     public_key: str = Field(..., description="Hex-encoded Ed25519 public key")
     role: str = Field(..., description="'buyer' or 'seller'")
     email: EmailStr = Field(..., description="Agent's email address")
+    
+    @field_validator("public_key")
+    @classmethod
+    def validate_public_key(cls, v: str) -> str:
+        """Validate that public_key is a 64-char hex string (32 bytes)."""
+        if not isinstance(v, str) or len(v) != 64:
+            raise ValueError("public_key must be 64 hex characters (32-byte key)")
+        try:
+            bytes.fromhex(v)
+        except ValueError:
+            raise ValueError("public_key must be valid hex")
+        return v
 
 
 class AgentRegisterResponse(BaseModel):

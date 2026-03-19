@@ -17,7 +17,7 @@ class OrderBook:
         self.redis = redis_client
         self.ttl = settings.order_book_ttl_seconds
 
-    async def publish_intent(self, intent_data: dict) -> str:
+    async def publish_intent(self, intent_id: str, intent_data: dict) -> str:
         """
         Store buyer intent in Redis.
         
@@ -25,7 +25,6 @@ class OrderBook:
         Stores: JSON intent data with timestamp score
         Returns: intent_id
         """
-        intent_id = f"intent_{uuid4().hex[:12]}"
         timestamp = intent_data.get("timestamp", 0)
         
         # Store in sorted set (score = timestamp)
@@ -43,7 +42,7 @@ class OrderBook:
         
         return intent_id
 
-    async def publish_ask(self, ask_data: dict) -> str:
+    async def publish_ask(self, ask_id: str, ask_data: dict) -> str:
         """
         Store seller ask in Redis.
         
@@ -51,8 +50,8 @@ class OrderBook:
         Stores: JSON ask data with price score
         Returns: ask_id
         """
-        ask_id = f"ask_{uuid4().hex[:12]}"
-        price = ask_data.get("floor_price_cents", 0)
+        # Support both "price" and "floor_price_cents" field names
+        price = ask_data.get("price") or ask_data.get("floor_price_cents", 0)
         
         # Store in sorted set (score = price for ascending order)
         await self.redis.zadd(
@@ -82,7 +81,8 @@ class OrderBook:
         3. Score remaining asks
         4. Return top `limit` sorted by score
         """
-        budget_ceiling = intent_data.get("budget_ceiling_cents", 0)
+        # Support both field name conventions
+        budget_ceiling = intent_data.get("budget_ceiling") or intent_data.get("budget_ceiling_cents", 0)
         
         # Get asks within budget (price <= budget_ceiling)
         ask_ids = await self.redis.zrangebyscore(
@@ -141,20 +141,31 @@ class OrderBook:
 
     def _is_compatible(self, ask: dict, intent: dict) -> bool:
         """Check if ask matches intent requirements."""
-        # Check dates
-        if (
-            ask.get("available_from_date") > intent.get("check_out_date") or
-            ask.get("available_to_date") < intent.get("check_in_date")
-        ):
+        # Handle case where vertical_fields exist for hotel vertical
+        ask_vertical = ask.get("vertical_fields", ask)
+        intent_vertical = intent.get("vertical_fields", intent)
+        
+        # Check dates if present
+        ask_checkin = ask_vertical.get("checkin_date") or ask.get("available_from_date")
+        ask_checkout = ask_vertical.get("checkout_date") or ask.get("available_to_date")
+        intent_checkin = intent_vertical.get("checkin_date") or intent.get("check_in_date")
+        intent_checkout = intent_vertical.get("checkout_date") or intent.get("check_out_date")
+        
+        if ask_checkin and intent_checkout and ask_checkin > intent_checkout:
+            return False
+        if ask_checkout and intent_checkin and ask_checkout < intent_checkin:
             return False
         
         # Check room type
-        acceptable_types = intent.get("room_types", [])
-        if acceptable_types and ask.get("room_type") not in acceptable_types:
+        acceptable_types = intent_vertical.get("acceptable_room_types", intent.get("room_types", []))
+        ask_room_type = ask_vertical.get("room_type")
+        if acceptable_types and ask_room_type and ask_room_type not in acceptable_types:
             return False
         
         # Check occupants
-        if ask.get("max_occupants", 0) < intent.get("occupants", 0):
+        ask_max_occupants = ask_vertical.get("max_occupants", ask.get("max_occupants", 0))
+        intent_occupants = intent_vertical.get("occupants", intent.get("occupants", 0))
+        if ask_max_occupants and intent_occupants and ask_max_occupants < intent_occupants:
             return False
         
         return True
@@ -169,21 +180,27 @@ class OrderBook:
         - reputation_score (0.15): Seller reputation
         - stake_bonus (0.10): Performance bond
         """
-        budget_ceiling = intent.get("budget_ceiling_cents", 1)
-        ask_price = ask.get("floor_price_cents", budget_ceiling)
+        # Support both field name conventions
+        budget_ceiling = intent.get("budget_ceiling") or intent.get("budget_ceiling_cents", 1)
+        ask_price = ask.get("price") or ask.get("floor_price_cents", budget_ceiling)
         
         # Price score: 1.0 at $0, 0.0 at budget ceiling
         price_score = 1.0 - (ask_price / budget_ceiling)
         price_score = max(0.0, min(1.0, price_score))
         
-        # Terms score (placeholder - all terms match for now)
+        # Terms score: Check if preferred terms match
         terms_score = 1.0
+        preferred_terms = intent.get("preferred_terms", {})
+        ask_terms = ask.get("terms", {})
+        if preferred_terms:
+            matches = sum(1 for k, v in preferred_terms.items() if ask_terms.get(k) == v)
+            terms_score = matches / len(preferred_terms) if preferred_terms else 1.0
         
         # Reputation score (0-100 → 0-1)
         reputation_score = ask.get("seller_reputation_score", 50) / 100.0
         
-        # Stake bonus
-        stake_amount = ask.get("stake_amount_cents", 0)
+        # Stake bonus - support both field names
+        stake_amount = ask.get("stake_amount") or ask.get("stake_amount_cents", 0)
         stake_bonus = 0.0
         if stake_amount >= 10000:
             stake_bonus = 0.10

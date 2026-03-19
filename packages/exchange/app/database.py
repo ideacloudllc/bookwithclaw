@@ -14,13 +14,19 @@ async def init_db():
     """Initialize database engine and session factory."""
     global engine, SessionLocal
     
-    engine = create_async_engine(
-        settings.database_url,
-        echo=settings.environment == "development",
-        pool_pre_ping=True,
-        pool_size=20,
-        max_overflow=10,
-    )
+    # SQLite doesn't support pool_size and max_overflow
+    kwargs = {
+        "echo": settings.environment == "development",
+    }
+    
+    if "sqlite" not in settings.database_url:
+        kwargs.update({
+            "pool_pre_ping": True,
+            "pool_size": 20,
+            "max_overflow": 10,
+        })
+    
+    engine = create_async_engine(settings.database_url, **kwargs)
     
     SessionLocal = sessionmaker(
         engine,

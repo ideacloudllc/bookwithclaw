@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# Set test environment
+# Set test environment BEFORE importing app
 os.environ.setdefault("ENVIRONMENT", "testing")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
@@ -21,14 +21,20 @@ os.environ.setdefault("SENDGRID_API_KEY", "SG.test_fake")
 
 from app.main import app
 from app.models import Base
+from app import database
 
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create event loop for tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def setup_database():
+    """Initialize test database once per session."""
+    await database.init_db()
+    yield
+    await database.close_db()
 
 
 @pytest.fixture

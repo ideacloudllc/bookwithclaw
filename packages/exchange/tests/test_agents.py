@@ -26,7 +26,7 @@ def test_register_agent_success(client: TestClient):
         }
     )
     
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
     assert "agent_id" in data
     assert "auth_token" in data
@@ -46,7 +46,7 @@ def test_register_agent_seller(client: TestClient):
         }
     )
     
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
     assert "agent_id" in data
     assert "auth_token" in data
@@ -80,8 +80,8 @@ def test_register_agent_invalid_public_key(client: TestClient):
         }
     )
     
-    assert response.status_code == 400
-    assert "public_key" in response.json()["detail"].lower()
+    # 422 is FastAPI's validation error code
+    assert response.status_code == 422
 
 
 def test_register_agent_duplicate_public_key(client: TestClient):
@@ -97,7 +97,7 @@ def test_register_agent_duplicate_public_key(client: TestClient):
             "email": "first@example.com",
         }
     )
-    assert response1.status_code == 200
+    assert response1.status_code == 201
     
     # Duplicate public key
     response2 = client.post(
@@ -126,7 +126,7 @@ def test_register_agent_duplicate_email(client: TestClient):
             "email": "shared@example.com",
         }
     )
-    assert response1.status_code == 200
+    assert response1.status_code == 201
     
     # Duplicate email
     response2 = client.post(

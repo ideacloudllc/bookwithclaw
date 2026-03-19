@@ -10,17 +10,6 @@ import redis.asyncio as redis
 from app.core.order_book import OrderBook
 
 
-@pytest.fixture
-async def order_book():
-    """Create an order book with Redis client."""
-    # Note: in real tests, would use real Redis or mock it
-    client = await redis.from_url("redis://localhost:6379/0", decode_responses=True)
-    book = OrderBook(client)
-    yield book
-    # Cleanup
-    await client.close()
-
-
 @pytest.mark.asyncio
 async def test_publish_intent():
     """Test publishing a buyer intent."""
