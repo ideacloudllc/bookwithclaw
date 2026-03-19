@@ -86,7 +86,7 @@ async def register_seller(
         "seller_id": seller_id,
         "email": request.email,
         "hotel_name": request.hotel_name,
-        "token": token,
+        "access_token": token,
         "next_step": "Complete your profile"
     }
 
@@ -114,7 +114,7 @@ async def login_seller(
         "seller_id": seller.agent_id,
         "email": seller.email,
         "hotel_name": seller.hotel_name,
-        "token": token
+        "access_token": token
     }
 
 

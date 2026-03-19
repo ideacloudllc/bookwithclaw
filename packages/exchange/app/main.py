@@ -7,6 +7,8 @@ from pathlib import Path
 import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 
 from app.config import settings
@@ -86,6 +88,21 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Add CORS middleware to allow React app to call API endpoints
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development (restrict in production)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Redirect /sellers to /sellers/ (canonical path)
+@app.get("/sellers", include_in_schema=False)
+async def redirect_sellers():
+    """Redirect /sellers to /sellers/ for canonical path."""
+    return RedirectResponse(url="/sellers/", status_code=301)
 
 # Include routers (order matters: UI routes must come AFTER API routes to override them)
 app.include_router(landing_router)           # Landing pages (sellers signup, home)
