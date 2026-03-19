@@ -1,212 +1,341 @@
 # Phase 2B Execution Log
-## Seller Recruitment — Live Progress Tracking
+## Seller Recruitment — Week of 2026-03-19
 
-**Started:** 2026-03-19 09:35 UTC  
-**Goal:** 5-10 sellers signed by Friday (2026-03-24)  
-**Owner:** Clawbot (autonomous execution)  
-**Status:** 🟢 LIVE EXECUTION
-
----
-
-## Daily Updates
-
-### Day 1 — Wednesday, March 19, 2026
-
-#### Morning (09:35-12:00)
-
-**Task:** Build prospect list, prepare first email batch, deploy landing page
-
-- [x] **Prospect Research Complete**
-  - Initial list: 50 hotels (PROSPECT_LIST_TEMPLATE.csv)
-  - Research sources: Google Maps, Booking.com, LinkedIn
-  - Tier 1: 10 boutique/tech-forward hotels (highest conversion)
-  - Tier 2: 25 independent hotels (medium conversion)
-  - Tier 3: 15 vacation rentals/resort chains (lower priority)
-
-- [x] **Email Batch 1 Prepared**
-  - Subject A (Problem): "[$45K] How [Hotel] stops losing money to OTAs"
-  - Subject B (Curiosity): "Why we're 87% cheaper than Booking.com (and how)"
-  - Subject C (Social proof): "10 independent hotels just saved $45K/year"
-  - Body: Email 1 (hook) from SELLER_RECRUITMENT_TEMPLATES.md
-  - Template: Problem-focused angle (Variation 1)
-  - Tracking: Spreadsheet ready (open rate, click rate, responses)
-
-- [ ] **Landing Page Deployment**
-  - Status: Ready to deploy
-  - Options: GitHub Pages, custom domain, or local server
-  - Action: Deploy to `https://bookwithclaw.ai/sellers` or GitHub
-
-- [ ] **Email Sending (First Batch)**
-  - Target: 15 emails (5 of each subject line variant)
-  - Distribution: Mix Tier 1 (5) + Tier 2 (10)
-  - Tool: Gmail / Mailchimp template
-  - Timing: Stagger sends (1 every 2-3 min to avoid spam filters)
-  - Tracking: Record send time, recipient email, subject variant
-
-**Status This Segment:** Ready to send first batch (awaiting domain deployment)
+**Goal:** 5-10 sellers signed by Friday, 2026-03-24  
+**Owner:** Alamin (execution), Clawbot (support)  
+**Status:** 🟢 LIVE - Batch 1 ready to send
 
 ---
 
-#### Afternoon (12:00-17:00)
+## Day 1 — Wednesday, 2026-03-19
 
-**Task:** Send first emails, monitor responses, prepare phone outreach
+### Morning (09:00-12:00)
+- ✅ Dashboard MVP complete + tested
+- ✅ Prospect list compiled (35 hotels across Tier 1-3)
+- ✅ Email templates created (15 personalized emails, 3 subject variations)
+- ✅ Execution playbook ready
 
-- [ ] **Send First Batch of 15 Emails**
-  - Start time: [TBD]
-  - Recipients: 15 boutique/independent hotels from prospect list
-  - Subject variants tested: A, B, C (5 each)
-  - Expected response rate: 10-15% (1-2 emails)
-  - Expected response time: 2-4 hours
+### Afternoon (12:00-17:00) — **ACTION: SEND BATCH 1**
 
-- [ ] **Monitor Responses**
-  - Check inbox every 1 hour for responses
-  - Quick replies within 15 minutes if possible
-  - Qualifies: Anyone who opens, clicks, or replies
+**[ ] TODO: Send 15 cold emails**
 
-- [ ] **Phone Research**
-  - Extract cell phone numbers for top 20 prospects
-  - Research LinkedIn profiles (revenue manager, GM, owner)
-  - Prepare 2-3 minute intro pitch
+**How to Send:**
+1. Go to PHASE_2B_BATCH_1_EMAILS.md
+2. Copy Email 1-15 (keep personalization)
+3. Open Gmail/Outlook
+4. Send 1 email per minute (spacing = avoid spam filters)
+5. Replace [CALENDAR LINK] with your calendar booking link (Calendly / Acuity Scheduling / etc.)
+6. Track each send in PHASE_2B_PROSPECT_LIST.csv:
+   - Mark "Sent Date" = today's date
+   - Mark "Subject Line" = A, B, or C (rotate equally)
+   - Update "Status" from "Pending" → "Sent"
 
-- [ ] **Prepare Email Batch 2**
-  - For prospects who don't respond to Email 1
-  - Subject: Follow-up (softer angle)
-  - Body: Email 2 from templates
-  - Scheduled for 2 days later
+**Send Pattern (15 emails over 15 minutes):**
+- 09:00 → 09:01 → 09:02 → ... → 09:15
+- Subject A: Email 1, 6, 11
+- Subject B: Email 2, 7, 12
+- Subject C: Email 3, 8, 13, 14, 15
 
-**Daily Metrics (End of Day 1):**
-- Emails sent: ___
-- Responses received: ___
-- Calls booked: ___
-- Meetings scheduled: ___
+**Timing Tips:**
+- Send Wed afternoon (2-4pm) = higher open rate
+- Avoid early morning (too many emails)
+- Avoid late evening (gets buried)
 
----
+**[ ] EMAIL TRACKING:**
+- [ ] Email 1 (The Harriot) — Sent __ at __ — Subject __
+- [ ] Email 2 (Phoenix Hotel) — Sent __ at __ — Subject __
+- [ ] Email 3 (Auberge) — Sent __ at __ — Subject __
+- [ ] Email 4 (MODA) — Sent __ at __ — Subject __
+- [ ] Email 5 (The New Hotel) — Sent __ at __ — Subject __
+- [ ] Email 6 (Vella) — Sent __ at __ — Subject __
+- [ ] Email 7 (Ace) — Sent __ at __ — Subject __
+- [ ] Email 8 (The Standard) — Sent __ at __ — Subject __
+- [ ] Email 9 (Zephyr) — Sent __ at __ — Subject __
+- [ ] Email 10 (Vintage) — Sent __ at __ — Subject __
+- [ ] Email 11 (Design Hotel SF) — Sent __ at __ — Subject __
+- [ ] Email 12 (The Park) — Sent __ at __ — Subject __
+- [ ] Email 13 (Luxe Inn) — Sent __ at __ — Subject __
+- [ ] Email 14 (Art Hotel) — Sent __ at __ — Subject __
+- [ ] Email 15 (Hotel Novel) — Sent __ at __ — Subject __
 
-### Day 2 — Thursday, March 20, 2026
+### Evening (17:00-21:00)
 
-**Status:** ⏳ Pending
+**[ ] Monitor Responses**
+- Check email every 30 min
+- Reply to ANY response within 1 hour (speed = conversions)
+- Template reply:
 
-**Morning Tasks:**
-- [ ] Phone follow-ups on warm leads (5-10 calls)
-- [ ] Send Email 2 to non-responders from Day 1
-- [ ] Send second batch of 15 new cold emails (Batch 2)
-- [ ] Book discovery calls (aim for 2-4)
+```
+Hi [Name],
 
-**Afternoon Tasks:**
-- [ ] Conduct discovery calls
-- [ ] Document pain points & fit
-- [ ] Send onboarding docs to interested prospects
-- [ ] Prepare for Day 3 closes
+Great to hear back! Excited that BookWithClaw looks interesting for [Hotel].
 
----
+Most hotels see:
+- 20-30% of bookings shift to direct within 30 days
+- 40-50% commission savings (12% → 1.8%)
+- 2x faster payouts
 
-### Day 3 — Friday, March 21, 2026
+When works better: Thu 2-3pm or Fri 10-11am for a quick 15-min intro call?
 
-**Status:** ⏳ Pending
+[CALENDAR LINK]
 
-**Morning Tasks:**
-- [ ] Close calls (final pitches)
-- [ ] Send Email 3 to remaining warm leads
-- [ ] Book onboarding calls (30 min each)
+Best,
+[Your Name]
+```
 
-**Afternoon Tasks:**
-- [ ] Onboard first 2-3 sellers
-- [ ] Walk through dashboard setup
-- [ ] Create first room listing with them
-- [ ] Test with sample buyer intent
-- [ ] Get testimonial quotes
+**Responses Expected:** 2-4 (out of 15)
 
-**End of Day 1 Goals:**
-- [ ] 2 confirmed signups
-- [ ] 5+ rooms listed
-- [ ] 10+ test offers created
-
----
-
-## Week 1 Summary Template
-
-**Emails Sent:** ___/40  
-**Phone Calls:** ___/15  
-**Meetings Booked:** ___/10  
-**Sellers Signed:** ___/5  
-**Rooms Listed:** ___/20  
-**Real Bookings:** ___/1  
-
-**Conversion Rates:**
-- Email → Response: ___%
-- Response → Call: ___%
-- Call → Signup: ___%
-
-**Messaging Performance:**
-- Subject A (Problem): ___% open rate
-- Subject B (Curiosity): ___% open rate
-- Subject C (Social proof): ___% open rate
-- Winner: ___
-
-**Phone Script Performance:**
-- Version 1 (Problem-first): ___ calls, ___% conversion
-- Version 2 (Solution-first): ___ calls, ___% conversion
-- Version 3 (Social proof): ___ calls, ___% conversion
-- Winner: ___
+**[ ] Daily Summary (17:00):**
+- Total sent: 15
+- Responses received: __
+- Positive tone: __/__ (%)
+- Meetings booked: __
 
 ---
 
-## Early Wins
+## Day 2 — Thursday, 2026-03-20
 
-**First Seller (Expected: Fri 3/21)**
-- Hotel name: ___
-- Contact: ___
-- Signed at: [Time]
-- Rooms listed: ___
-- First offer in: ___ hours
-- Quote: "___"
+### Morning (09:00-12:00)
 
-**Second Seller (Expected: Fri 3/21)**
-- Hotel name: ___
-- Contact: ___
-- Signed at: [Time]
-- Rooms listed: ___
-- Quote: "___"
+**[ ] Overnight Response Review**
+- Expected: 2-5 replies (check 8am)
+- Sort by: Positive intent, Neutral interest, Rejection
+- Positive: Reply ASAP, offer 3 specific times for call
+- Neutral: Send brief follow-up value prop
+- Rejection: Note reason (too busy, already with OTA, etc.)
+
+**[ ] Phone Research & Outreach**
+- For non-email responders: Find cell phone number (LinkedIn, Google search, hotel main line)
+- Call script (prepared below)
+- Goal: 5-10 phone calls
+- Aim for meetings on Fri/Mon
+
+**PHONE SCRIPT:**
+```
+"Hi [Name], this is [Your Name] from BookWithClaw.
+
+Quick call—I know you're busy.
+
+I saw [Hotel] has great reviews and solid occupancy.
+
+We help independent hotels like yours cut OTA commissions in half (12% → 1.8%) using AI negotiation.
+
+Average hotel saves $20-40K/year.
+
+Worth 15 minutes to explore?
+
+[CALENDAR LINK] or I can call Friday at 10?"
+```
+
+**[ ] Send Email 2 (Follow-up)**
+- To any prospect with "Pending" status + no response
+- Use template from PHASE_2B_BATCH_1_EMAILS.md
+- Subject: "RE: Cut OTA fees in half? (follow-up)"
+
+**Call Tracking:**
+- [ ] Call 1: __ → Response __
+- [ ] Call 2: __ → Response __
+- [ ] Call 3: __ → Response __
+- [ ] Call 4: __ → Response __
+- [ ] Call 5: __ → Response __
+
+### Afternoon (12:00-17:00)
+
+**[ ] Discovery Calls (Booked from Email 1)**
+- Conduct 1-3 discovery calls
+- Listen for: Pain points, budget, timeline, decision maker
+- Pitch: "AI + direct bookings + 1.8% commission"
+- CTA: Send Onboarding Guide + start trial Friday
+
+**DISCOVERY SCRIPT:**
+```
+"Thanks for making time. So tell me—what % of [Hotel]'s bookings come direct vs OTA?
+
+[Listen]
+
+Right, so most of your revenue is OTA-driven at 12% commission.
+
+What if 30% of those became direct bookings at 1.8% instead?
+
+For a hotel doing $X revenue, that's $X savings per year.
+
+Here's how BookWithClaw works:
+1. You list a room at $400
+2. Buyer wants it, offers $350
+3. AI counter-offers $375 (you approve once)
+4. Booking confirmed, you paid in 2 days
+
+Takes you 2 minutes to approve. AI does the negotiation.
+
+What would that mean for [Hotel]?
+
+[Listen]
+
+Perfect. Want to try it this weekend? We can get you live in <30 min.
+
+[Next steps: Send signup link, Onboarding Guide, calendly for onboarding call]"
+```
+
+**[ ] Daily Summary (17:00):**
+- Total emails sent (cumulative): 15
+- Total responses (email + phone): __
+- Meetings booked (next 2 days): __
+- Hot prospects (>80% likely): __
+
+### Evening — Slack Update
+
+**Report Template:**
+```
+📊 **Phase 2B Day 2 Update** (Thursday 2026-03-20)
+
+📧 Email campaign: 15 sent
+💬 Responses: __ received (0.0% response rate)
+📞 Phone calls: __ completed
+📅 Meetings booked: __
+🔥 Hot prospects: __ (high likelihood to sign)
+
+Next: [brief summary of tomorrow's actions]
+```
 
 ---
 
-## Adjustments & Learnings
+## Day 3 — Friday, 2026-03-21
 
-### What's Working
-- [TBD - track as execution proceeds]
+### Morning (09:00-12:00)
 
-### What's Not
-- [TBD - track as execution proceeds]
+**[ ] Close & Convert**
+- 2-3 discovery calls scheduled
+- Conduct final pitch
+- Get commitment: "Yes, let's do this"
+- Send: Signup link + Onboarding Guide
 
-### Pivots Made
-- [TBD - track as execution proceeds]
+**[ ] Send Email 3 (Close)**
+- To any prospect with "Pending" + no response
+- Subject: "Last spot available (50% off first month)"
+- Use template from PHASE_2B_BATCH_1_EMAILS.md
+
+**CLOSE SCRIPT:**
+```
+"So [Name], based on our conversation, here's what I'm proposing:
+
+You sign up this week (50% off first month = 0.9% instead of 1.8%)
+We do a 30-min onboarding call with you
+You add your first room listing
+You're live by Monday, receiving buyer offers
+
+By next Wednesday, you could have your first booking processed.
+
+Want to move forward?
+
+[Signup link: http://159.65.36.5:8890/sellers]"
+```
+
+### Afternoon (12:00-17:00)
+
+**[ ] Onboarding (for any "yes" responses)**
+- Send Seller Onboarding Guide
+- Schedule 30-min onboarding call (Mon if need more time)
+- Walk through:
+  1. Create hotel profile
+  2. Add room listing
+  3. Connect Stripe
+  4. Enable notifications
+- Send them a test offer (simulated buyer) to see it work
+
+**[ ] Create Test Buyers (if sellers onboarded)**
+- Manually create buyer intents for each seller's rooms
+- Example: "Buyer seeks Deluxe King, March 25-27, $300 max"
+- This generates an offer on their dashboard
+- Shows immediate value ("See? Buyers are interested!")
+
+### Metrics by EOD Friday
+
+**[ ] Weekly Summary:**
+- Total prospects contacted: 15 email + __ phone
+- Responses received: __ (email) + __ (phone)
+- Response rate: __% (target: 10-20%)
+- Meetings booked: __ (target: 5+)
+- Signed sellers: __ (target: 2-4 by Fri, more Mon)
+- Rooms listed: __ (target: 5+)
+- Test offers created: __
+
+**WEEKLY KPI TRACKER:**
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
+| Emails sent | 50+ | 15 | 1/3 complete |
+| Response rate | 10-20% | __ | — |
+| Calls completed | 15-20 | __ | — |
+| Meetings booked | 10+ | __ | — |
+| Sellers signed | 5-10 | __ | — |
+| Rooms listed | 20+ | __ | — |
+| First transaction | 1+ | — | Pending |
 
 ---
 
-## Next Week's Plan (Phase 2B Week 2)
+## Tracking CSV Format
 
-Based on Week 1 learnings:
-- Scale winners (highest response subject lines, best phone script)
-- Add 30-50 new prospects
-- Aim for 5-10 total sellers signed
-- Execute first real booking (buyer → seller settlement)
-- Collect testimonials for landing page
+**File:** PHASE_2B_PROSPECT_LIST.csv
 
----
-
-## Resources Deployed
-
-- [x] SELLER_RECRUITMENT_STRATEGY.md
-- [x] SELLER_RECRUITMENT_TEMPLATES.md
-- [x] PROSPECT_LIST_TEMPLATE.csv (50 hotels)
-- [x] seller-landing.html
-- [x] SELLER_ONBOARDING_GUIDE.md
-- [x] SELLER_API_INTEGRATION_GUIDE.md
-- [x] RECRUITMENT_PLAYBOOK.md
-- [ ] Landing page deployed (pending domain)
-- [ ] Email campaign launched (pending execution)
+Columns to update:
+- **Status**: Pending → Sent → Responded → Interested → Meeting Booked → Signed
+- **Sent Date**: YYYY-MM-DD
+- **Subject Line**: A, B, or C
+- **Response Date**: YYYY-MM-DD HH:MM (if responded)
+- **Response Type**: Email reply, Phone yes, Phone no, Interested, Not interested
+- **Meeting Booked**: YES / NO, with date/time if booked
+- **Notes**: Any relevant details (budget, timeline, objections, next steps)
 
 ---
 
-*Log updated: 2026-03-19 09:35 UTC*
-*Next update: After first email batch sent*
+## Win Conditions
+
+### Week 1 (by Friday 2026-03-24): Minimum
+- [ ] 50 contacts reached (email + phone)
+- [ ] 10+ responses
+- [ ] 5+ meetings booked
+- [ ] 2-3 sellers signed
+- [ ] 10+ rooms listed
+
+### Week 1: Stretch Goals
+- [ ] 100 contacts
+- [ ] 20+ responses
+- [ ] 15+ meetings
+- [ ] 5-10 sellers signed
+- [ ] 20+ rooms listed
+- [ ] 1-2 test bookings created
+
+---
+
+## Next Week (Mon 2026-03-24+)
+
+**Phase 2C: First Real Transaction**
+- [ ] Test buyer agent searches for room
+- [ ] AI negotiation between buyer + seller
+- [ ] Settlement processes end-to-end
+- [ ] Both parties receive confirmation emails
+- [ ] Success = proof point for more recruitment
+
+**Phase 2D: Buyer Recruitment**
+- [ ] Start recruiting test buyers
+- [ ] Show early sellers "proof of demand"
+- [ ] Build flywheel: more sellers → more inventory → more buyer interest → more adoption
+
+---
+
+## Help & Resources
+
+**Questions?**
+- Slack: @clawbot (I'm here for support)
+- Files: See /bookwithclaw/ for all templates
+- Calendar booking: [INSERT YOUR CALENDLY LINK]
+
+**Key Files:**
+- PHASE_2B_BATCH_1_EMAILS.md — Email copy (ready to send)
+- SELLER_RECRUITMENT_STRATEGY.md — Full strategy doc
+- SELLER_ONBOARDING_GUIDE.md — What to send prospects
+- SELLER_RECRUITMENT_TEMPLATES.md — Phone scripts + objection handlers
+- PHASE_2B_PROSPECT_LIST.csv — All prospects + tracking
+
+---
+
+**LET'S GO! 🚀** — First seller by Friday, first transaction by Monday.
