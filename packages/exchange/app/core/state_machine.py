@@ -1,227 +1,170 @@
-"""Negotiation session state machine."""
+"""Negotiation state machine for agent-to-agent hotel booking."""
 
-import json
-from datetime import datetime, timedelta
 from enum import Enum
+from datetime import datetime, timedelta
 from typing import Optional
+from uuid import uuid4
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum
+from sqlalchemy.orm import declarative_base
 
-from app.models.session import Session, SessionState
+from app.config import settings
+
+Base = declarative_base()
 
 
-class InvalidStateTransitionError(Exception):
-    """Raised when state transition is invalid."""
+class SessionState(str, Enum):
+    """Negotiation session states."""
+    OPEN = "OPEN"
+    MATCHING = "MATCHING"
+    NEGOTIATING = "NEGOTIATING"
+    AGREED = "AGREED"
+    SETTLING = "SETTLING"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
 
-    pass
+
+class Session(Base):
+    """Session model for negotiation tracking."""
+    __tablename__ = "sessions"
+    
+    session_id = Column(String(255), primary_key=True)
+    state = Column(SQLEnum(SessionState), default=SessionState.OPEN)
+    buyer_id = Column(String(255), nullable=True)
+    seller_id = Column(String(255), nullable=True)
+    
+    intent_id = Column(String(255), nullable=True)
+    ask_id = Column(String(255), nullable=True)
+    
+    round_number = Column(Integer, default=0)
+    agreed_price_cents = Column(Integer, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(seconds=settings.session_negotiation_timeout))
 
 
 class NegotiationStateMachine:
-    """Manages negotiation session state machine."""
-
-    # Valid transitions
+    """Manage session state and transitions."""
+    
     VALID_TRANSITIONS = {
-        SessionState.OPEN: [SessionState.MATCHING],
+        SessionState.OPEN: [SessionState.MATCHING, SessionState.FAILED],
         SessionState.MATCHING: [SessionState.NEGOTIATING, SessionState.FAILED],
-        SessionState.NEGOTIATING: [
-            SessionState.NEGOTIATING,  # Multiple rounds
-            SessionState.AGREED,
-            SessionState.FAILED,
-        ],
-        SessionState.AGREED: [SessionState.SETTLING],
+        SessionState.NEGOTIATING: [SessionState.AGREED, SessionState.FAILED],
+        SessionState.AGREED: [SessionState.SETTLING, SessionState.FAILED],
         SessionState.SETTLING: [SessionState.COMPLETE, SessionState.FAILED],
+        SessionState.COMPLETE: [],
+        SessionState.FAILED: [],
     }
-
-    def __init__(self, db: AsyncSession):
-        self.db = db
-
-    async def open_session(
-        self,
-        session_id: str,
-        buyer_agent_id: str,
-        vertical: str,
-        max_rounds: int = 10,
-    ) -> Session:
-        """Create a new negotiation session."""
+    
+    def __init__(self):
+        pass
+    
+    async def create_session(self, buyer_id: str, intent_id: str) -> Session:
+        """Create a new session for a buyer intent."""
         session = Session(
-            session_id=session_id,
-            buyer_agent_id=buyer_agent_id,
+            session_id=f"session_{uuid4().hex[:16]}",
             state=SessionState.OPEN,
-            vertical=vertical,
-            round_number=1,
-            max_rounds=max_rounds,
-            created_at=datetime.utcnow(),
+            buyer_id=buyer_id,
+            intent_id=intent_id,
         )
-        self.db.add(session)
-        await self.db.commit()
         return session
-
-    async def get_session(self, session_id: str) -> Optional[Session]:
-        """Fetch session by ID."""
-        result = await self.db.execute(
-            select(Session).where(Session.session_id == session_id)
-        )
-        return result.scalars().first()
-
+    
     async def transition(
         self,
-        session_id: str,
+        session: Session,
         new_state: SessionState,
+        reason: Optional[str] = None
     ) -> Session:
         """
-        Transition session to a new state.
-
-        Args:
-            session_id: Session to transition
-            new_state: Target state
-
-        Returns:
-            Updated session
-
-        Raises:
-            InvalidStateTransitionError if transition is invalid
-            ValueError if session not found
+        Transition session to new state.
+        
+        Validates state transition rules strictly.
         """
-        session = await self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
-        # Check valid transition
-        valid_next = self.VALID_TRANSITIONS.get(session.state, [])
-        if new_state not in valid_next:
+        if new_state not in self.VALID_TRANSITIONS.get(session.state, []):
             raise InvalidStateTransitionError(
                 f"Cannot transition from {session.state} to {new_state}"
             )
-
-        # Update state
+        
         session.state = new_state
         session.updated_at = datetime.utcnow()
-
-        await self.db.commit()
+        
         return session
-
-    async def set_seller(self, session_id: str, seller_agent_id: str) -> Session:
-        """Assign a seller to the session."""
-        session = await self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
-        session.seller_agent_id = seller_agent_id
-        session.updated_at = datetime.utcnow()
-        await self.db.commit()
-        return session
-
-    async def store_intent(
-        self,
-        session_id: str,
-        intent_data: dict,
-    ) -> Session:
-        """Store buyer intent data in session."""
-        session = await self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
-        session.intent_data = intent_data
-        session.updated_at = datetime.utcnow()
-        await self.db.commit()
-        return session
-
-    async def store_ask(
-        self,
-        session_id: str,
-        ask_data: dict,
-    ) -> Session:
-        """Store seller ask data in session."""
-        session = await self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
-        session.ask_data = ask_data
-        session.updated_at = datetime.utcnow()
-        await self.db.commit()
-        return session
-
-    async def increment_round(self, session_id: str) -> Session:
-        """Increment negotiation round number."""
-        session = await self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
-        # Check if max rounds exceeded
-        if session.round_number >= session.max_rounds:
-            # Auto-fail session
-            session.state = SessionState.FAILED
-        else:
-            session.round_number += 1
-
-        session.updated_at = datetime.utcnow()
-        await self.db.commit()
-        return session
-
-    async def agree_price(self, session_id: str, price_cents: int) -> Session:
-        """Record agreed price and transition to AGREED."""
-        session = await self.get_session(session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
-        session.agreed_price = price_cents
-        session.state = SessionState.AGREED
-        session.updated_at = datetime.utcnow()
-        await self.db.commit()
-        return session
-
-    async def check_timeouts(self) -> list[Session]:
-        """
-        Check all sessions for timeout and fail them if exceeded.
-
-        Returns:
-            List of sessions that timed out
-        """
-        timed_out = []
-        now = datetime.utcnow()
-
-        # Fetch all open/negotiating/settling sessions
-        result = await self.db.execute(
-            select(Session).where(
-                Session.state.in_(
-                    [
-                        SessionState.OPEN,
-                        SessionState.MATCHING,
-                        SessionState.NEGOTIATING,
-                        SessionState.SETTLING,
-                    ]
-                )
+    
+    async def handle_buyer_intent(self, session: Session, intent: dict) -> Session:
+        """Handle buyer intent message."""
+        if session.state != SessionState.OPEN:
+            raise InvalidStateTransitionError(
+                f"Cannot handle intent in state {session.state}"
             )
-        )
-        sessions = result.scalars().all()
+        
+        # Move to MATCHING
+        await self.transition(session, SessionState.MATCHING)
+        return session
+    
+    async def handle_seller_ask(self, session: Session, ask: dict) -> Session:
+        """Handle seller ask message."""
+        if session.state != SessionState.MATCHING:
+            raise InvalidStateTransitionError(
+                f"Cannot handle ask in state {session.state}"
+            )
+        
+        session.seller_id = ask.get("sender_id")
+        session.ask_id = ask.get("ask_id")
+        
+        # Move to NEGOTIATING
+        await self.transition(session, SessionState.NEGOTIATING)
+        return session
+    
+    async def handle_counter_offer(self, session: Session, counter: dict) -> Session:
+        """Handle counter-offer message."""
+        if session.state != SessionState.NEGOTIATING:
+            raise InvalidStateTransitionError(
+                f"Cannot handle counter in state {session.state}"
+            )
+        
+        # Validate envelope (counter must be within bounds)
+        # This is checked at the messaging layer
+        
+        session.round_number += 1
+        
+        # Check max rounds
+        if session.round_number > settings.max_negotiation_rounds:
+            await self.transition(session, SessionState.FAILED, "Max rounds exceeded")
+        
+        return session
+    
+    async def handle_deal_accepted(self, session: Session, deal: dict) -> Session:
+        """Handle deal_accepted message."""
+        if session.state != SessionState.NEGOTIATING:
+            raise InvalidStateTransitionError(
+                f"Cannot accept deal in state {session.state}"
+            )
+        
+        session.agreed_price_cents = deal.get("agreed_price_cents")
+        
+        # Move to AGREED
+        await self.transition(session, SessionState.AGREED)
+        return session
+    
+    async def handle_walkaway(self, session: Session, reason: str) -> Session:
+        """Handle session_walkaway message."""
+        if session.state in [SessionState.COMPLETE, SessionState.FAILED]:
+            return session
+        
+        # Move to FAILED
+        await self.transition(session, SessionState.FAILED, reason)
+        return session
+    
+    async def check_timeouts(self, session: Session) -> Optional[Session]:
+        """Check if session has expired."""
+        if datetime.utcnow() > session.expires_at:
+            await self.transition(session, SessionState.FAILED, "Session timeout")
+            return session
+        
+        return None
 
-        for session in sessions:
-            # Determine timeout based on state
-            timeout_seconds = self._get_timeout_for_state(session.state)
-            timeout_at = session.created_at + timedelta(seconds=timeout_seconds)
 
-            if now > timeout_at:
-                session.state = SessionState.FAILED
-                session.updated_at = now
-                timed_out.append(session)
-
-        if timed_out:
-            await self.db.commit()
-
-        return timed_out
-
-    # Private helpers
-
-    def _get_timeout_for_state(self, state: SessionState) -> int:
-        """Get timeout in seconds for a given state."""
-        from app.config import settings
-
-        if state == SessionState.OPEN:
-            return settings.session_open_timeout
-        elif state in [SessionState.MATCHING, SessionState.NEGOTIATING]:
-            return settings.session_negotiation_timeout
-        elif state == SessionState.SETTLING:
-            return settings.session_settlement_timeout
-        else:
-            return 3600  # 1 hour default
+class InvalidStateTransitionError(Exception):
+    """Raised when invalid state transition attempted."""
+    pass

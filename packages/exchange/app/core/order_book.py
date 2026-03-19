@@ -1,7 +1,8 @@
-"""Redis-based order book for buyer intents and seller asks."""
+"""Redis-based order book for intent/ask matching and storage."""
 
 import json
-from typing import Optional
+from typing import Optional, List
+from uuid import uuid4
 
 import redis.asyncio as redis
 from pydantic import BaseModel
@@ -9,212 +10,196 @@ from pydantic import BaseModel
 from app.config import settings
 
 
-class OrderBookEntry(BaseModel):
-    """Entry in the order book."""
-
-    id: str
-    vertical: str
-    agent_id: str
-    data: dict
-    timestamp: float
-
-
 class OrderBook:
-    """Redis-backed order book for buyer intents and seller asks."""
+    """Manage buyer intents and seller asks in Redis."""
 
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
         self.ttl = settings.order_book_ttl_seconds
 
-    async def publish_intent(self, intent_id: str, intent_data: dict) -> str:
+    async def publish_intent(self, intent_data: dict) -> str:
         """
-        Publish a buyer intent to the order book.
-
-        Args:
-            intent_id: Unique intent identifier
-            intent_data: Intent payload (includes vertical, timestamp, etc.)
-
-        Returns:
-            The intent_id
+        Store buyer intent in Redis.
+        
+        Key format: ob:bids:hotels (sorted set)
+        Stores: JSON intent data with timestamp score
+        Returns: intent_id
         """
-        vertical = intent_data.get("vertical", "unknown")
+        intent_id = f"intent_{uuid4().hex[:12]}"
         timestamp = intent_data.get("timestamp", 0)
-
-        # Store in sorted set: score = timestamp (for FIFO ordering)
-        key = f"ob:intents:{vertical}"
-        await self.redis.zadd(key, {intent_id: timestamp}, ex=self.ttl)
-
-        # Store full intent data
-        data_key = f"ob:intent:{intent_id}"
-        await self.redis.set(
-            data_key,
-            json.dumps(intent_data),
-            ex=self.ttl,
+        
+        # Store in sorted set (score = timestamp)
+        await self.redis.zadd(
+            "ob:bids:hotels",
+            {intent_id: timestamp}
         )
-
+        
+        # Store full intent data
+        await self.redis.setex(
+            f"ob:intent:{intent_id}",
+            self.ttl,
+            json.dumps(intent_data)
+        )
+        
         return intent_id
 
-    async def publish_ask(self, ask_id: str, ask_data: dict) -> str:
+    async def publish_ask(self, ask_data: dict) -> str:
         """
-        Publish a seller ask to the order book.
-
-        Args:
-            ask_id: Unique ask identifier
-            ask_data: Ask payload (includes vertical, price, etc.)
-
-        Returns:
-            The ask_id
+        Store seller ask in Redis.
+        
+        Key format: ob:asks:hotels (sorted set)
+        Stores: JSON ask data with price score
+        Returns: ask_id
         """
-        vertical = ask_data.get("vertical", "unknown")
-        price = ask_data.get("price", 999999999)  # High default
-
-        # Store in sorted set: score = price (for price ordering)
-        key = f"ob:asks:{vertical}"
-        await self.redis.zadd(key, {ask_id: price}, ex=self.ttl)
-
-        # Store full ask data
-        data_key = f"ob:ask:{ask_id}"
-        await self.redis.set(
-            data_key,
-            json.dumps(ask_data),
-            ex=self.ttl,
+        ask_id = f"ask_{uuid4().hex[:12]}"
+        price = ask_data.get("floor_price_cents", 0)
+        
+        # Store in sorted set (score = price for ascending order)
+        await self.redis.zadd(
+            "ob:asks:hotels",
+            {ask_id: price}
         )
-
+        
+        # Store full ask data
+        await self.redis.setex(
+            f"ob:ask:{ask_id}",
+            self.ttl,
+            json.dumps(ask_data)
+        )
+        
         return ask_id
 
     async def get_matching_asks(
         self,
         intent_data: dict,
-        limit: int = 5,
-    ) -> list[dict]:
+        limit: int = 5
+    ) -> List[dict]:
         """
-        Find matching asks for a buyer intent.
-
-        Steps:
-        1. Filter asks by price (must be <= buyer's budget_ceiling)
-        2. Validate against vertical schema
-        3. Score each ask
-        4. Return top `limit` sorted by score descending
-
-        Args:
-            intent_data: Buyer intent payload
-            limit: Max number of asks to return
-
-        Returns:
-            List of matching ask data dicts, sorted by score descending
+        Get asks matching buyer intent.
+        
+        1. ZRANGEBYSCORE to filter by price
+        2. Fetch full ask data
+        3. Score remaining asks
+        4. Return top `limit` sorted by score
         """
-        vertical = intent_data.get("vertical", "unknown")
-        budget_ceiling = intent_data.get("budget_ceiling", 0)
-
-        key = f"ob:asks:{vertical}"
-
-        # Step 1: Price filter (ZRANGEBYSCORE: 0 to budget_ceiling)
-        ask_ids = await self.redis.zrangebyscore(key, 0, budget_ceiling, start=0, num=100)
-
-        if not ask_ids:
-            return []
-
-        # Step 2-3: Fetch full data and score each ask
-        matches = []
+        budget_ceiling = intent_data.get("budget_ceiling_cents", 0)
+        
+        # Get asks within budget (price <= budget_ceiling)
+        ask_ids = await self.redis.zrangebyscore(
+            "ob:asks:hotels",
+            min=0,
+            max=budget_ceiling,
+            start=0,
+            num=limit * 2  # Fetch more to account for filtering
+        )
+        
+        # Fetch full asks
+        asks = []
         for ask_id in ask_ids:
-            ask_id_str = ask_id.decode() if isinstance(ask_id, bytes) else ask_id
-            data_key = f"ob:ask:{ask_id_str}"
-            ask_json = await self.redis.get(data_key)
+            ask_json = await self.redis.get(f"ob:ask:{ask_id}")
+            if ask_json:
+                ask_data = json.loads(ask_json)
+                ask_data["ask_id"] = ask_id
+                asks.append(ask_data)
+        
+        # Score and sort
+        scored_asks = [
+            (ask, self._score_ask(ask, intent_data))
+            for ask in asks
+            if self._is_compatible(ask, intent_data)
+        ]
+        
+        # Sort by score (highest first)
+        scored_asks.sort(key=lambda x: x[1], reverse=True)
+        
+        # Return top `limit` asks without scores
+        return [ask for ask, _ in scored_asks[:limit]]
 
-            if not ask_json:
-                continue
-
-            ask_data = json.loads(ask_json)
-
-            # Validate against vertical schema (simplified - in production use verticals registry)
-            if not self._validate_vertical(vertical, ask_data):
-                continue
-
-            # Score this ask
-            score = self._score_ask(ask_data, intent_data)
-            matches.append((ask_data, score))
-
-        # Step 4: Sort by score descending and return top `limit`
-        matches.sort(key=lambda x: x[1], reverse=True)
-        return [ask_data for ask_data, _ in matches[:limit]]
-
-    async def remove_intent(self, intent_id: str, vertical: str = "hotels") -> None:
+    async def remove_intent(self, intent_id: str) -> None:
         """Remove intent from order book."""
-        key = f"ob:intents:{vertical}"
-        await self.redis.zrem(key, intent_id)
+        await self.redis.zrem("ob:bids:hotels", intent_id)
         await self.redis.delete(f"ob:intent:{intent_id}")
 
-    async def remove_ask(self, ask_id: str, vertical: str = "hotels") -> None:
+    async def remove_ask(self, ask_id: str) -> None:
         """Remove ask from order book."""
-        key = f"ob:asks:{vertical}"
-        await self.redis.zrem(key, ask_id)
+        await self.redis.zrem("ob:asks:hotels", ask_id)
         await self.redis.delete(f"ob:ask:{ask_id}")
 
-    async def get_active_intent_count(self, agent_id: str, vertical: str = "hotels") -> int:
-        """Count active intents for rate limiting."""
-        # Simplified: count all intents for now
-        # In production, would track per-agent
-        key = f"ob:intents:{vertical}"
-        count = await self.redis.zcard(key)
-        return count or 0
+    async def get_active_intent_count(self, agent_id: str) -> int:
+        """Count active intents for an agent (rate limiting)."""
+        all_intents = await self.redis.zrange("ob:bids:hotels", 0, -1)
+        count = 0
+        
+        for intent_id in all_intents:
+            intent_json = await self.redis.get(f"ob:intent:{intent_id}")
+            if intent_json:
+                intent_data = json.loads(intent_json)
+                if intent_data.get("sender_id") == agent_id:
+                    count += 1
+        
+        return count
 
-    # Private helpers
-
-    def _validate_vertical(self, vertical: str, data: dict) -> bool:
-        """Validate data against vertical schema."""
-        if vertical == "hotels":
-            # Check required hotel fields in vertical_fields
-            vf = data.get("vertical_fields", {})
-            required = {"checkin_date", "checkout_date", "room_type", "max_occupants"}
-            return all(k in vf for k in required)
+    def _is_compatible(self, ask: dict, intent: dict) -> bool:
+        """Check if ask matches intent requirements."""
+        # Check dates
+        if (
+            ask.get("available_from_date") > intent.get("check_out_date") or
+            ask.get("available_to_date") < intent.get("check_in_date")
+        ):
+            return False
+        
+        # Check room type
+        acceptable_types = intent.get("room_types", [])
+        if acceptable_types and ask.get("room_type") not in acceptable_types:
+            return False
+        
+        # Check occupants
+        if ask.get("max_occupants", 0) < intent.get("occupants", 0):
+            return False
+        
         return True
 
-    def _score_ask(self, ask_data: dict, intent_data: dict) -> float:
+    def _score_ask(self, ask: dict, intent: dict) -> float:
         """
         Score an ask against an intent.
-
+        
         Formula:
-        - price_score (40%): 1.0 when price=0, 0.0 when price=budget_ceiling
-        - terms_score (35%): fraction of intent terms satisfied by ask
-        - reputation_score (15%): normalized to 0-1
-        - stake_bonus (10%): tiered bonus for high stake amounts
+        - price_score (0.40): How close to budget
+        - terms_score (0.35): Matching terms
+        - reputation_score (0.15): Seller reputation
+        - stake_bonus (0.10): Performance bond
         """
-        budget = intent_data.get("budget_ceiling", 1)
-        price = ask_data.get("price", budget)
-
-        # Price score: 1.0 - (price / budget)
-        price_score = max(0, 1.0 - (price / budget))
-
-        # Terms score
-        intent_terms = intent_data.get("preferred_terms", {})
-        ask_terms = ask_data.get("terms", {})
-        if intent_terms:
-            satisfied = sum(
-                1 for k, v in intent_terms.items() if ask_terms.get(k) == v
-            )
-            terms_score = satisfied / len(intent_terms)
-        else:
-            terms_score = 1.0
-
-        # Reputation score (0-100 -> 0-1)
-        rep_score = ask_data.get("seller_reputation_score", 0) / 100.0
-
+        budget_ceiling = intent.get("budget_ceiling_cents", 1)
+        ask_price = ask.get("floor_price_cents", budget_ceiling)
+        
+        # Price score: 1.0 at $0, 0.0 at budget ceiling
+        price_score = 1.0 - (ask_price / budget_ceiling)
+        price_score = max(0.0, min(1.0, price_score))
+        
+        # Terms score (placeholder - all terms match for now)
+        terms_score = 1.0
+        
+        # Reputation score (0-100 → 0-1)
+        reputation_score = ask.get("seller_reputation_score", 50) / 100.0
+        
         # Stake bonus
-        stake = ask_data.get("stake_amount", 0)
+        stake_amount = ask.get("stake_amount_cents", 0)
         stake_bonus = 0.0
-        if stake >= 10000:
+        if stake_amount >= 10000:
             stake_bonus = 0.10
-        elif stake >= 2500:
+        elif stake_amount >= 2500:
             stake_bonus = 0.08
-        elif stake >= 500:
+        elif stake_amount >= 500:
             stake_bonus = 0.05
-        elif stake >= 100:
+        elif stake_amount >= 100:
             stake_bonus = 0.02
-
-        # Weighted score
-        return (
-            (price_score * 0.40)
-            + (terms_score * 0.35)
-            + (rep_score * 0.15)
-            + (stake_bonus * 0.10)
+        
+        # Combined score
+        total = (
+            (price_score * 0.40) +
+            (terms_score * 0.35) +
+            (reputation_score * 0.15) +
+            (stake_bonus * 0.10)
         )
+        
+        return total
