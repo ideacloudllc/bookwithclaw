@@ -47,3 +47,4 @@ postgres_data/
 redis_data/
 pgdata/
 redisdata/
+.venv/
