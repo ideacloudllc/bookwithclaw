@@ -29,7 +29,8 @@ That's real economics: 100 bookings/month at $450 = $54K in OTA fees OR $8.1K wi
 
 We built BookWithClaw specifically for independent hotels like The Plaza. AI agents negotiate room rates directly with buyers on your behalf. You set the floor price. They stay in control.
 
-Takes 10 minutes to set up.
+Takes 10 minutes to set up. Check it out here:
+http://159.65.36.5:8890/sellers
 
 Worth a 15-minute call this week?
 
@@ -65,7 +66,8 @@ How? We're not a global OTA with 10,000 employees. We're a protocol + matching e
 
 **Math:** 100 bookings at $450 = $45,900/year savings for Grand View Inn.
 
-Interested in seeing how it works for your property?
+Interested in seeing how it works? Check out the landing page:
+http://159.65.36.5:8890/sellers
 
 [BOOK A CALL]
 
@@ -107,6 +109,9 @@ Here's what changed for them:
 4. Deal closes, payout settles in 2 days
 
 We're bringing 20 hotel partners onto BookWithClaw this quarter. First 10 get 50% off their first 30 days.
+
+Check out the landing page to see how it works:
+http://159.65.36.5:8890/sellers
 
 If Sunset Lodge wants to be in the early cohort, let's chat this week.
 
