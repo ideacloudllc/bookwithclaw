@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import DateTime, Enum as SQLEnum, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -29,7 +29,14 @@ class Agent(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=True)  # For seller login
     hotel_name: Mapped[str] = mapped_column(String(255), nullable=True)  # For sellers
+    address: Mapped[str] = mapped_column(String(500), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    check_in_time: Mapped[str] = mapped_column(String(10), default="14:00", nullable=True)
+    check_out_time: Mapped[str] = mapped_column(String(10), default="11:00", nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    
+    # Relationships
+    rooms = relationship("Room", back_populates="seller")

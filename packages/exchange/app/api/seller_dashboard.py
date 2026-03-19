@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.dependencies import get_db
 from app.auth import hash_password, verify_password, create_seller_token, verify_seller_token
 from app.models.agent import Agent, AgentRole
+from app.models.room import Room
 
 router = APIRouter(prefix="/api/sellers", tags=["seller-dashboard-api"])
 
@@ -136,11 +137,10 @@ async def get_seller_profile(
         "agent_id": seller.agent_id,
         "hotel_name": seller.hotel_name,
         "email": seller.email,
-        "location": "San Francisco, CA",
-        "check_in_time": "3:00 PM",
-        "check_out_time": "11:00 AM",
-        "phone": "+1-555-0000",
-        "description": "Beautiful hotel in downtown"
+        "address": seller.address,
+        "phone": seller.phone,
+        "check_in_time": seller.check_in_time,
+        "check_out_time": seller.check_out_time,
     }
 
 
@@ -159,13 +159,29 @@ async def update_seller_profile(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    # Update hotel_name if provided
+    # Update fields if provided
     if "hotel_name" in profile_data:
         seller.hotel_name = profile_data["hotel_name"]
+    if "address" in profile_data:
+        seller.address = profile_data["address"]
+    if "phone" in profile_data:
+        seller.phone = profile_data["phone"]
+    if "check_in_time" in profile_data:
+        seller.check_in_time = profile_data["check_in_time"]
+    if "check_out_time" in profile_data:
+        seller.check_out_time = profile_data["check_out_time"]
     
     await session.commit()
     
-    return {"status": "updated", "seller_id": seller.agent_id}
+    return {
+        "agent_id": seller.agent_id,
+        "hotel_name": seller.hotel_name,
+        "email": seller.email,
+        "address": seller.address,
+        "phone": seller.phone,
+        "check_in_time": seller.check_in_time,
+        "check_out_time": seller.check_out_time,
+    }
 
 
 @router.get("/me")
@@ -271,55 +287,110 @@ async def list_rooms(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
-    return {
-        "rooms": [
-            {
-                "room_id": "rm_1",
-                "name": "Deluxe King",
-                "description": "Spacious room with city view",
-                "capacity": 2,
-                "amenities": ["WiFi", "A/C", "Mini Bar", "TV"],
-                "base_rate": 350,
-                "floor_price": 280,
-                "availability": "open",
-                "photos": 3,
-                "status": "active",
-                "views": 24,
-                "inquiries": 3,
-                "bookings": 2
-            },
-            {
-                "room_id": "rm_2",
-                "name": "Standard Queen",
-                "description": "Comfortable room with garden view",
-                "capacity": 2,
-                "amenities": ["WiFi", "A/C", "TV"],
-                "base_rate": 280,
-                "floor_price": 220,
-                "availability": "open",
-                "photos": 2,
-                "status": "active",
-                "views": 18,
-                "inquiries": 5,
-                "bookings": 3
-            },
-            {
-                "room_id": "rm_3",
-                "name": "Suite",
-                "description": "Luxury suite with private lounge",
-                "capacity": 4,
-                "amenities": ["WiFi", "A/C", "Mini Bar", "TV", "Lounge", "Kitchen"],
-                "base_rate": 550,
-                "floor_price": 450,
-                "availability": "open",
-                "photos": 5,
-                "status": "active",
-                "views": 42,
-                "inquiries": 2,
-                "bookings": 1
-            }
-        ]
-    }
+    # Fetch rooms from database
+    rooms_result = await session.execute(
+        select(Room).where(Room.seller_id == seller_id)
+    )
+    rooms = rooms_result.scalars().all()
+    
+    return [room.to_dict() for room in rooms]
+
+
+@router.post("/rooms")
+async def create_room(
+    data: dict,
+    seller_id: str = Depends(get_seller_id_from_token),
+    session: AsyncSession = Depends(get_db)
+):
+    """Create a new room."""
+    # Verify seller exists
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == seller_id)
+    )
+    seller = result.scalars().first()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    # Create room
+    room = Room(
+        id=f"room_{uuid4().hex[:8]}",
+        seller_id=seller_id,
+        name=data.get("name"),
+        type=data.get("type", "standard"),
+        description=data.get("description"),
+        base_price=data.get("base_price"),
+        floor_price=data.get("floor_price"),
+        max_occupancy=data.get("max_occupancy", 2)
+    )
+    
+    session.add(room)
+    await session.commit()
+    
+    return room.to_dict()
+
+
+@router.put("/rooms/{room_id}")
+async def update_room(
+    room_id: str,
+    data: dict,
+    seller_id: str = Depends(get_seller_id_from_token),
+    session: AsyncSession = Depends(get_db)
+):
+    """Update a room."""
+    # Fetch room
+    result = await session.execute(
+        select(Room).where(Room.id == room_id)
+    )
+    room = result.scalars().first()
+    
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if room.seller_id != seller_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    # Update fields
+    if "name" in data:
+        room.name = data["name"]
+    if "type" in data:
+        room.type = data["type"]
+    if "description" in data:
+        room.description = data["description"]
+    if "base_price" in data:
+        room.base_price = data["base_price"]
+    if "floor_price" in data:
+        room.floor_price = data["floor_price"]
+    if "max_occupancy" in data:
+        room.max_occupancy = data["max_occupancy"]
+    
+    await session.commit()
+    return room.to_dict()
+
+
+@router.delete("/rooms/{room_id}")
+async def delete_room(
+    room_id: str,
+    seller_id: str = Depends(get_seller_id_from_token),
+    session: AsyncSession = Depends(get_db)
+):
+    """Delete a room."""
+    # Fetch room
+    result = await session.execute(
+        select(Room).where(Room.id == room_id)
+    )
+    room = result.scalars().first()
+    
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    if room.seller_id != seller_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    
+    await session.delete(room)
+    await session.commit()
+    
+    return {"status": "deleted"}
 
 
 @router.get("/offers")
