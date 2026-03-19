@@ -2,9 +2,11 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import redis.asyncio as redis
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.config import settings
@@ -92,8 +94,16 @@ app.include_router(agents_router)            # Agent registration
 app.include_router(sessions_router)          # Negotiation sessions
 app.include_router(seller_dashboard_router)  # Seller dashboard API
 app.include_router(buyer_dashboard_router)   # Buyer dashboard API (auth-protected)
-app.include_router(dashboard_ui_router)      # Seller dashboard UI (must be after API)
-app.include_router(buyer_ui_router)          # Buyer dashboard UI (must be after API)
+
+# Mount React seller dashboard (new version)
+static_dir = Path(__file__).parent / "static" / "seller-dashboard"
+if static_dir.exists():
+    app.mount("/sellers", StaticFiles(directory=str(static_dir), html=True), name="seller_app")
+    logger.info(f"✓ React seller dashboard mounted at /sellers")
+
+# Mount legacy dashboard UI (fallback if React version not available)
+# app.include_router(dashboard_ui_router)      # Seller dashboard UI (must be after API)
+# app.include_router(buyer_ui_router)          # Buyer dashboard UI (must be after API)
 
 
 if __name__ == "__main__":
