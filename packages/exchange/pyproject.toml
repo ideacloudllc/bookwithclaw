@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "bookwithclaw-exchange"
+version = "0.1.0"
+description = "Agent-to-agent negotiation exchange with atomic settlement"
+authors = ["BookWithClaw Team"]
+license = "TBD"
+readme = "../../README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115"
+uvicorn = { extras = ["standard"], version = "^0.32" }
+websockets = "^13.1"
+sqlalchemy = { extras = ["asyncio"], version = "^2.0" }
+alembic = "^1.14"
+asyncpg = "^0.30"
+redis = { extras = ["hiredis"], version = "^5.2" }
+pydantic = "^2.10"
+pydantic-settings = "^2.7"
+stripe = "^11.4"
+sendgrid = "^6.11"
+cryptography = "^44.0"
+python-jose = "^3.3"
+httpx = "^0.28"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
+pytest-asyncio = "^0.24"
+httpx = "^0.28"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]

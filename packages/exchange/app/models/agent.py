@@ -1,0 +1,33 @@
+"""Agent model."""
+
+from datetime import datetime
+from enum import Enum
+
+from sqlalchemy import DateTime, Enum as SQLEnum, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base
+
+
+class AgentRole(str, Enum):
+    """Agent role: buyer or seller."""
+
+    BUYER = "buyer"
+    SELLER = "seller"
+
+
+class Agent(Base):
+    """Agent registration and authentication."""
+
+    __tablename__ = "agents"
+
+    agent_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    public_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    role: Mapped[AgentRole] = mapped_column(
+        SQLEnum(AgentRole), nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
