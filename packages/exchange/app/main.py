@@ -15,6 +15,8 @@ from app.api.agents import router as agents_router
 from app.api.health import router as health_router
 from app.api.sessions import router as sessions_router
 from app.api.landing import router as landing_router
+from app.api.seller_dashboard import router as seller_dashboard_router
+from app.api.dashboard_ui import router as dashboard_ui_router
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +85,12 @@ app = FastAPI(
 )
 
 # Include routers
-app.include_router(landing_router)  # Landing pages (sellers signup, home)
-app.include_router(health_router)   # Health check
-app.include_router(agents_router)   # Agent registration
-app.include_router(sessions_router) # Negotiation sessions
+app.include_router(landing_router)           # Landing pages (sellers signup, home)
+app.include_router(health_router)            # Health check
+app.include_router(agents_router)            # Agent registration
+app.include_router(seller_dashboard_router)  # Seller dashboard API
+app.include_router(dashboard_ui_router)      # Seller dashboard UI
+app.include_router(sessions_router)          # Negotiation sessions
 
 
 if __name__ == "__main__":
