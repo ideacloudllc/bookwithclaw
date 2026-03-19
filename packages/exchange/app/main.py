@@ -13,7 +13,7 @@ from app import database  # Initialize database module first
 # Now safe to import routers that depend on database
 from app.api.agents import router as agents_router
 from app.api.health import router as health_router
-from app.api.sessions import router as sessions_router
+# from app.api.sessions import router as sessions_router  # TODO: Step 6 - WebSocket sessions
 from app.api.landing import router as landing_router
 from app.api.seller_dashboard import router as seller_dashboard_router
 from app.api.dashboard_ui import router as dashboard_ui_router, buyer_router as buyer_ui_router
@@ -91,7 +91,7 @@ app.include_router(health_router)            # Health check
 app.include_router(agents_router)            # Agent registration
 app.include_router(seller_dashboard_router)  # Seller dashboard API
 app.include_router(buyer_dashboard_router)   # Buyer dashboard API (auth-protected)
-app.include_router(sessions_router)          # Negotiation sessions
+# app.include_router(sessions_router)          # Negotiation sessions (TODO: Step 6)
 app.include_router(dashboard_ui_router)      # Seller dashboard UI (must be after API)
 app.include_router(buyer_ui_router)          # Buyer dashboard UI (must be after API)
 
