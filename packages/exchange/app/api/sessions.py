@@ -10,19 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.order_book import OrderBook
-from app.core.signing import verify_signature, canonical_json
+from app.core.signing import verify_signature, canonical_json, verify_jwt_token
 from app.core.state_machine import (
     InvalidStateTransitionError,
     NegotiationStateMachine,
 )
-from app.dependencies import get_current_agent
 from app.database import SessionLocal
 from app.models.session import SessionState
-from app.schemas.messages import (
-    DealAcceptedMessage,
-    BuyerIntentMessage,
-    SellerAskMessage,
-)
+from app.dependencies import get_db
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 logger = logging.getLogger(__name__)
@@ -67,9 +62,7 @@ manager = ConnectionManager()
 
 
 @router.post("/")
-async def create_session(
-    current_agent: dict = Depends(get_current_agent),
-) -> dict:
+async def create_session() -> dict:
     """
     Create a new negotiation session.
 
@@ -192,10 +185,7 @@ async def websocket_endpoint(session_id: str, websocket: WebSocket):
 
 
 @router.get("/{session_id}")
-async def get_session_status(
-    session_id: str,
-    current_agent: dict = Depends(get_current_agent),
-) -> dict:
+async def get_session_status(session_id: str) -> dict:
     """Get session status and history."""
     async with SessionLocal() as db:
         state_machine = NegotiationStateMachine(db)
