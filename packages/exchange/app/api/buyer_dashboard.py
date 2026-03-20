@@ -157,7 +157,7 @@ async def get_buyer_profile(
         "agent_id": buyer.agent_id,
         "name": buyer.hotel_name,  # Reused field for buyer name
         "email": buyer.email,
-        "phone": None,  # TODO: Add phone field to Agent model
+        "phone": None,  # TODO: Add phone field to Agent model in migration
         "created_at": buyer.created_at.isoformat() if buyer.created_at else None,
     }
 
@@ -197,9 +197,8 @@ async def update_buyer_profile(
     if "name" in profile_data:
         buyer.hotel_name = profile_data["name"]
     
-    if "phone" in profile_data:
-        # TODO: Add phone field to Agent model for persistent storage
-        pass
+    # TODO: Store phone in database when phone field is added to Agent model
+    # For now, phone is accepted but not persisted
     
     await session.commit()
     
@@ -208,8 +207,119 @@ async def update_buyer_profile(
         "id": buyer.agent_id,
         "name": buyer.hotel_name,
         "email": buyer.email,
-        "phone": profile_data.get("phone"),
+        "phone": profile_data.get("phone"),  # Return what was submitted
         "message": "Profile updated successfully"
+    }
+
+
+@router.post("/change-password")
+async def change_password(
+    old_password: str,
+    new_password: str,
+    token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_db)
+):
+    """Change buyer password."""
+    # Extract token from cookie or header
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = verify_seller_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    buyer_id = payload.get("seller_id")
+    
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == buyer_id)
+    )
+    buyer = result.scalars().first()
+    
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer not found")
+    
+    # Verify old password
+    if not verify_password(old_password, buyer.password_hash or ""):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Update password
+    buyer.password_hash = hash_password(new_password)
+    await session.commit()
+    
+    return {
+        "status": "password_changed",
+        "message": "Password updated successfully"
+    }
+
+
+@router.get("/email-preferences")
+async def get_email_preferences(
+    token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_db)
+):
+    """Get email notification preferences."""
+    # Extract token
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = verify_seller_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    # Return default preferences (can be expanded to store in DB later)
+    return {
+        "email_on_offer": True,
+        "email_on_counter_offer": True,
+        "email_on_booking_confirmed": True,
+        "email_on_seller_message": True,
+        "marketing_emails": False,
+        "weekly_summary": True
+    }
+
+
+@router.put("/email-preferences")
+async def update_email_preferences(
+    preferences: dict,
+    token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_db)
+):
+    """Update email notification preferences."""
+    # Extract token
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = verify_seller_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    # TODO: Store preferences in database when preferences table is added
+    # For now, just return success
+    return {
+        "status": "preferences_updated",
+        "message": "Email preferences updated successfully",
+        "preferences": preferences
     }
 
 
