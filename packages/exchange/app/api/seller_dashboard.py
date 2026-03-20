@@ -133,7 +133,9 @@ async def get_seller_profile(
     seller_id: str = Depends(get_seller_id_from_token),
     session: AsyncSession = Depends(get_db)
 ):
-    """Get seller profile."""
+    """Get seller profile with real stats."""
+    from sqlalchemy import func
+    
     result = await session.execute(
         select(Agent).where(Agent.agent_id == seller_id)
     )
@@ -142,7 +144,18 @@ async def get_seller_profile(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
+    # Count seller's rooms
+    rooms_count = await session.execute(
+        select(func.count(Room.id)).where(Room.seller_id == seller_id)
+    )
+    listings = rooms_count.scalar() or 0
+    
+    # For now, bookings count is 0 (no bookings table yet)
+    # TODO: Count from bookings table when booking system is implemented
+    total_bookings = 0
+    
     return {
+        "id": seller.agent_id,
         "agent_id": seller.agent_id,
         "hotel_name": seller.hotel_name,
         "email": seller.email,
@@ -150,6 +163,11 @@ async def get_seller_profile(
         "phone": None,
         "check_in_time": "14:00",
         "check_out_time": "11:00",
+        "stripe_account_id": seller.stripe_account_id,
+        "stripe_status": seller.stripe_status,
+        "created_at": seller.created_at.isoformat(),
+        "listings_count": listings,
+        "total_bookings": total_bookings,
     }
 
 

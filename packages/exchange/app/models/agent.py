@@ -29,6 +29,8 @@ class Agent(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=True)  # For seller login
     hotel_name: Mapped[str] = mapped_column(String(255), nullable=True)  # For sellers
+    stripe_account_id: Mapped[str] = mapped_column(String(255), nullable=True)  # Stripe Connect account ID
+    stripe_status: Mapped[str] = mapped_column(String(50), default="not_connected", nullable=False)  # not_connected, pending, connected
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

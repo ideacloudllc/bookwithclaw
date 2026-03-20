@@ -41,6 +41,7 @@ export interface Booking {
 
 export interface SellerProfile {
   id: string;
+  agent_id?: string;
   email: string;
   hotel_name: string;
   address?: string;
@@ -48,7 +49,10 @@ export interface SellerProfile {
   check_in_time?: string;
   check_out_time?: string;
   stripe_status?: string;
-  stripe_connect_id?: string;
+  stripe_account_id?: string;
+  created_at?: string;
+  listings_count?: number;
+  total_bookings?: number;
 }
 
 export interface AuthResponse {

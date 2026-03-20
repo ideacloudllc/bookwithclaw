@@ -80,6 +80,19 @@ export const ProfileTab = () => {
     }
   };
 
+  const handleStripeConnect = () => {
+    // For now, show a placeholder - in production this would redirect to Stripe OAuth
+    alert('Stripe Connect integration coming soon! You will be redirected to Stripe to authorize your account.');
+    // TODO: Implement Stripe OAuth flow
+    // window.location.href = `${process.env.REACT_APP_API_URL}/api/sellers/stripe/connect`;
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+  };
+
   if (loading) {
     return <div className="text-center py-12 text-gray-500">Loading profile...</div>;
   }
@@ -177,11 +190,12 @@ export const ProfileTab = () => {
           </div>
 
           {/* Stripe Status Card */}
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
+          <div className={`bg-white rounded-lg shadow p-6 border-l-4 ${profile?.stripe_status === 'connected' ? 'border-green-500' : 'border-orange-500'}`}>
             <h4 className="font-bold text-gray-900 mb-3">Stripe Connect</h4>
             {profile?.stripe_status === 'connected' ? (
               <div>
                 <p className="text-sm text-green-600 font-medium mb-2">✓ Connected</p>
+                <p className="text-xs text-gray-500 mb-2">Account ID: {profile?.stripe_account_id}</p>
                 <p className="text-xs text-gray-500">Ready to receive payments</p>
               </div>
             ) : (
@@ -190,7 +204,10 @@ export const ProfileTab = () => {
                 <p className="text-xs text-gray-500 mb-3">
                   Connect Stripe to receive payouts
                 </p>
-                <button className="w-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium py-2 px-3 rounded text-sm transition">
+                <button 
+                  onClick={handleStripeConnect}
+                  className="w-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium py-2 px-3 rounded text-sm transition"
+                >
                   Connect Stripe
                 </button>
               </div>
@@ -203,15 +220,15 @@ export const ProfileTab = () => {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Member since</span>
-                <span className="font-medium">March 2025</span>
+                <span className="font-medium">{formatDate(profile?.created_at)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Listings</span>
-                <span className="font-medium">12</span>
+                <span className="font-medium">{profile?.listings_count || 0}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Bookings</span>
-                <span className="font-medium">24</span>
+                <span className="font-medium">{profile?.total_bookings || 0}</span>
               </div>
             </div>
           </div>
