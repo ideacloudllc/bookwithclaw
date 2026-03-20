@@ -112,39 +112,60 @@ app.include_router(sessions_router)          # Negotiation sessions
 app.include_router(seller_dashboard_router)  # Seller dashboard API
 app.include_router(buyer_dashboard_router)   # Buyer dashboard API (auth-protected)
 
-# React SPA catch-all route (must come BEFORE mount)
-static_dir = Path(__file__).parent / "static" / "seller-dashboard"
-index_file = static_dir / "index.html"
+# React SPA catch-all routes for seller and buyer dashboards
+seller_static_dir = Path(__file__).parent / "static" / "seller-dashboard"
+seller_index_file = seller_static_dir / "index.html"
 
-if static_dir.exists():
-    # First, try to serve actual static files (assets, etc.)
-    # If not found, serve index.html for SPA routing
-    
+buyer_static_dir = Path(__file__).parent / "static" / "buyer-dashboard"
+buyer_index_file = buyer_static_dir / "index.html"
+
+# Redirect /buyers to /buyers/ (canonical path)
+@app.get("/buyers", include_in_schema=False)
+async def redirect_buyers():
+    """Redirect /buyers to /buyers/ for canonical path."""
+    return RedirectResponse(url="/buyers/", status_code=301)
+
+# Seller Dashboard SPA
+if seller_static_dir.exists():
     @app.get("/sellers/{full_path:path}", include_in_schema=False)
     async def seller_spa_catchall(full_path: str):
-        """Serve React app files or index.html for SPA routing"""
-        # Build the file path
-        file_path = static_dir / full_path
-        
-        # If it's a real file, serve it
+        """Serve React seller dashboard files or index.html for SPA routing"""
+        file_path = seller_static_dir / full_path
         if file_path.is_file():
             return FileResponse(file_path)
-        
-        # For SPA routes (non-files), serve index.html and let React Router handle it
-        if index_file.exists():
-            return FileResponse(index_file)
-        
+        if seller_index_file.exists():
+            return FileResponse(seller_index_file)
         return {"detail": "Not Found"}
     
-    # Also mount the root /sellers path
     @app.get("/sellers/", include_in_schema=False)
     async def seller_spa_root():
-        """Serve React app root"""
-        if index_file.exists():
-            return FileResponse(index_file)
+        """Serve React seller dashboard root"""
+        if seller_index_file.exists():
+            return FileResponse(seller_index_file)
         return {"detail": "Not Found"}
     
     logger.info(f"✓ React seller dashboard mounted at /sellers")
+
+# Buyer Dashboard SPA
+if buyer_static_dir.exists():
+    @app.get("/buyers/{full_path:path}", include_in_schema=False)
+    async def buyer_spa_catchall(full_path: str):
+        """Serve React buyer dashboard files or index.html for SPA routing"""
+        file_path = buyer_static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        if buyer_index_file.exists():
+            return FileResponse(buyer_index_file)
+        return {"detail": "Not Found"}
+    
+    @app.get("/buyers/", include_in_schema=False)
+    async def buyer_spa_root():
+        """Serve React buyer dashboard root"""
+        if buyer_index_file.exists():
+            return FileResponse(buyer_index_file)
+        return {"detail": "Not Found"}
+    
+    logger.info(f"✓ React buyer dashboard mounted at /buyers")
 
 # Mount legacy dashboard UI (fallback if React version not available)
 # app.include_router(dashboard_ui_router)      # Seller dashboard UI (must be after API)
