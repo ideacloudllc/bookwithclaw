@@ -16,7 +16,7 @@ export const useAuth = () => {
         const response = await sellers.register({ email, password, hotel_name }) as any;
         if (response?.access_token) {
           setAuthToken(response.access_token);
-          navigate('/sellers/portal');
+          navigate('/portal');
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Signup failed';
@@ -37,7 +37,7 @@ export const useAuth = () => {
         const response = await sellers.login({ email, password }) as any;
         if (response?.access_token) {
           setAuthToken(response.access_token);
-          navigate('/sellers/portal');
+          navigate('/portal');
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Login failed';
