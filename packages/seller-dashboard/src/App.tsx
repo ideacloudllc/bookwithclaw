@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { getAuthToken } from './utils/auth';
 
 function App() {
+  // Dynamic check - will re-evaluate on each render
   const isAuthenticated = !!getAuthToken();
 
   return (

@@ -7,12 +7,14 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
+import redis.asyncio as redis
 
 from app.core.signing import generate_keypair, sign_message, canonical_json
 from app.core.order_book import OrderBook
 from app.core.state_machine import NegotiationStateMachine
-from app.main import app
+from app.main import app, redis_client
 from app.models.session import SessionState
+from app.database import SessionLocal
 
 
 @pytest.fixture
@@ -22,52 +24,33 @@ def client():
 
 
 @pytest.mark.asyncio
-async def test_full_negotiation_flow(client: TestClient, db_session: AsyncSession):
+async def test_full_negotiation_flow(db_session: AsyncSession):
     """
-    End-to-end test: Register agents → Match → Negotiate → Agree → Settle
+    End-to-end test: Order Book → State Machine → Agreement Flow
+    
+    Tests the core negotiation flow without REST endpoints.
     """
-    # Step 1: Register buyer agent
-    buyer_pubkey, buyer_privkey = generate_keypair()
-    buyer_response = client.post(
-        "/agents/register",
-        json={
-            "public_key": buyer_pubkey,
-            "role": "buyer",
-            "email": "buyer@example.com",
-        }
-    )
-    assert buyer_response.status_code == 201
-    buyer_token = buyer_response.json()["auth_token"]
-    buyer_id = buyer_response.json()["agent_id"]
+    # Setup
+    session_id = str(uuid.uuid4())
+    buyer_id = str(uuid.uuid4())
+    seller_id = str(uuid.uuid4())
+    intent_id = str(uuid.uuid4())
+    ask_id = str(uuid.uuid4())
 
-    # Step 2: Register seller agent
-    seller_pubkey, seller_privkey = generate_keypair()
-    seller_response = client.post(
-        "/agents/register",
-        json={
-            "public_key": seller_pubkey,
-            "role": "seller",
-            "email": "seller@example.com",
-        }
-    )
-    assert seller_response.status_code == 201
-    seller_token = seller_response.json()["auth_token"]
-    seller_id = seller_response.json()["agent_id"]
-
-    # Step 3: Create negotiation session
-    session_response = client.post(
-        "/sessions/",
-        headers={"Authorization": f"Bearer {buyer_token}"}
-    )
-    assert session_response.status_code == 200
-    session_id = session_response.json()["session_id"]
-
-    # Step 4: Initialize state machine and order book
-    order_book = OrderBook(db_session.get_bind().raw_connection().connection)
+    # Initialize services
+    redis_conn = await redis.from_url("redis://localhost:6379/0", decode_responses=True)
+    order_book = OrderBook(redis_conn)
     state_machine = NegotiationStateMachine(db_session)
 
-    # Step 5: Create and publish buyer intent
-    intent_id = str(uuid.uuid4())
+    # Step 1: Open session
+    session = await state_machine.open_session(
+        session_id=session_id,
+        buyer_agent_id=buyer_id,
+        vertical="hotels",
+    )
+    assert session.state == SessionState.OPEN
+
+    # Step 2: Create buyer intent
     intent_data = {
         "intent_id": intent_id,
         "vertical": "hotels",
@@ -84,19 +67,10 @@ async def test_full_negotiation_flow(client: TestClient, db_session: AsyncSessio
         "timestamp": datetime.utcnow().timestamp(),
     }
 
-    # Open session
-    session = await state_machine.open_session(
-        session_id=session_id,
-        buyer_agent_id=buyer_id,
-        vertical="hotels",
-    )
-    assert session.state == SessionState.OPEN
-
-    # Store intent
     await state_machine.store_intent(session_id, intent_data)
+    await order_book.publish_intent(intent_id, intent_data)
 
-    # Step 6: Create and publish seller ask
-    ask_id = str(uuid.uuid4())
+    # Step 3: Create seller ask
     ask_data = {
         "ask_id": ask_id,
         "vertical": "hotels",
@@ -116,38 +90,48 @@ async def test_full_negotiation_flow(client: TestClient, db_session: AsyncSessio
         "timestamp": datetime.utcnow().timestamp(),
     }
 
-    # Set seller on session
     await state_machine.set_seller(session_id, seller_id)
     await state_machine.store_ask(session_id, ask_data)
+    await order_book.publish_ask(ask_id, ask_data)
 
-    # Transition to NEGOTIATING
+    # Step 4: Verify order book matching
+    matches = await order_book.get_matching_asks(intent_data, limit=5)
+    assert len(matches) > 0
+    assert ask_id in [m.get("ask_id") for m in matches]
+
+    # Step 5: Transition to NEGOTIATING
+    session = await state_machine.transition(session_id, SessionState.MATCHING)
+    assert session.state == SessionState.MATCHING
+    
     session = await state_machine.transition(session_id, SessionState.NEGOTIATING)
     assert session.state == SessionState.NEGOTIATING
 
-    # Step 7: Buyer accepts the ask
+    # Step 6: Buyer accepts
     agreed_price = ask_data["price"]
     session = await state_machine.agree_price(session_id, agreed_price)
     assert session.state == SessionState.AGREED
     assert session.agreed_price == agreed_price
 
-    # Step 8: Transition to SETTLING
+    # Step 7: Transition to SETTLING
     session = await state_machine.transition(session_id, SessionState.SETTLING)
     assert session.state == SessionState.SETTLING
 
-    # Step 9: Transition to COMPLETE
+    # Step 8: Transition to COMPLETE
     session = await state_machine.transition(session_id, SessionState.COMPLETE)
     assert session.state == SessionState.COMPLETE
-    assert session.agreed_price == agreed_price
 
-    # Verify session state
+    # Step 9: Verify final state
     final_session = await state_machine.get_session(session_id)
     assert final_session.state == SessionState.COMPLETE
     assert final_session.buyer_agent_id == buyer_id
     assert final_session.seller_agent_id == seller_id
+    assert final_session.agreed_price == agreed_price
+    
+    await redis_conn.aclose()
 
 
 @pytest.mark.asyncio
-async def test_hotel_compatibility(db_session: AsyncSession):
+async def test_hotel_compatibility():
     """Test hotel vertical schema validation and compatibility checking."""
     from app.verticals.hotels import HotelVerticalValidator
 

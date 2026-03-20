@@ -52,7 +52,8 @@ export const useAuth = () => {
 
   const logout = useCallback(() => {
     clearAuthToken();
-    navigate('/sellers/login');
+    // Use hard redirect for logout to ensure clean state reset
+    window.location.href = '/sellers/login';
   }, [navigate]);
 
   const isAuthenticated = !!getAuthToken();
