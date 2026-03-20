@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Cookie, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -119,6 +119,97 @@ async def login_buyer(
         "buyer_id": buyer.agent_id,
         "email": buyer.email,
         "token": token
+    }
+
+
+@router.get("/profile")
+async def get_buyer_profile(
+    token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_db)
+):
+    """Get buyer profile information."""
+    # Extract token from cookie or header
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = verify_seller_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    buyer_id = payload.get("seller_id")  # Note: stored as seller_id in JWT
+    
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == buyer_id)
+    )
+    buyer = result.scalars().first()
+    
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer not found")
+    
+    return {
+        "id": buyer.agent_id,
+        "agent_id": buyer.agent_id,
+        "name": buyer.hotel_name,  # Reused field for buyer name
+        "email": buyer.email,
+        "phone": None,  # TODO: Add phone field to Agent model
+        "created_at": buyer.created_at.isoformat() if buyer.created_at else None,
+    }
+
+
+@router.put("/profile")
+async def update_buyer_profile(
+    profile_data: dict,
+    token: Optional[str] = Cookie(None),
+    authorization: Optional[str] = Header(None),
+    session: AsyncSession = Depends(get_db)
+):
+    """Update buyer profile information."""
+    # Extract token from cookie or header
+    if authorization:
+        parts = authorization.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = verify_seller_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    buyer_id = payload.get("seller_id")  # Note: stored as seller_id in JWT
+    
+    result = await session.execute(
+        select(Agent).where(Agent.agent_id == buyer_id)
+    )
+    buyer = result.scalars().first()
+    
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer not found")
+    
+    # Update allowed fields
+    if "name" in profile_data:
+        buyer.hotel_name = profile_data["name"]
+    
+    if "phone" in profile_data:
+        # TODO: Add phone field to Agent model for persistent storage
+        pass
+    
+    await session.commit()
+    
+    return {
+        "status": "updated",
+        "id": buyer.agent_id,
+        "name": buyer.hotel_name,
+        "email": buyer.email,
+        "phone": profile_data.get("phone"),
+        "message": "Profile updated successfully"
     }
 
 
