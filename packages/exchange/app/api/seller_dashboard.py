@@ -409,35 +409,10 @@ async def list_offers(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
+    # TODO: Return actual offers from database once offer system is implemented
+    # For now, return empty list (seller has no offers yet)
     return {
-        "offers": [
-            {
-                "offer_id": "off_001",
-                "room_id": "rm_1",
-                "buyer_name": "John Traveler",
-                "room_type": "Deluxe King",
-                "checkin": "2026-03-22",
-                "checkout": "2026-03-24",
-                "nights": 2,
-                "offered_price": 320,
-                "total": 640,
-                "status": "pending",
-                "received_at": "2026-03-19T09:30:00Z"
-            },
-            {
-                "offer_id": "off_002",
-                "room_id": "rm_2",
-                "buyer_name": "Jane Smith",
-                "room_type": "Standard Queen",
-                "checkin": "2026-03-25",
-                "checkout": "2026-03-27",
-                "nights": 2,
-                "offered_price": 280,
-                "total": 560,
-                "status": "pending",
-                "received_at": "2026-03-19T08:15:00Z"
-            }
-        ]
+        "offers": []
     }
 
 
@@ -456,33 +431,8 @@ async def list_bookings(
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
+    # TODO: Return actual bookings from database once booking system is implemented
+    # For now, return empty list (seller has no bookings yet)
     return {
-        "bookings": [
-            {
-                "booking_id": "bk_001",
-                "room_id": "rm_3",
-                "guest_name": "Robert Johnson",
-                "room_type": "Suite",
-                "checkin": "2026-03-20",
-                "checkout": "2026-03-22",
-                "nights": 2,
-                "final_price": 450,
-                "total": 900,
-                "status": "confirmed",
-                "booked_at": "2026-03-18T14:00:00Z"
-            },
-            {
-                "booking_id": "bk_002",
-                "room_id": "rm_1",
-                "guest_name": "Emma Wilson",
-                "room_type": "Deluxe King",
-                "checkin": "2026-03-28",
-                "checkout": "2026-03-30",
-                "nights": 2,
-                "final_price": 340,
-                "total": 680,
-                "status": "confirmed",
-                "booked_at": "2026-03-17T10:30:00Z"
-            }
-        ]
+        "bookings": []
     }
