@@ -118,6 +118,7 @@ async def login_buyer(
         "status": "authenticated",
         "buyer_id": buyer.agent_id,
         "email": buyer.email,
+        "access_token": token,
         "token": token
     }
 
