@@ -29,7 +29,21 @@ export const apiCall = async <T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `API Error: ${response.status}`);
+    // Handle both string and object detail fields
+    let errorMessage = 'Request failed';
+    if (error?.detail) {
+      if (typeof error.detail === 'string') {
+        errorMessage = error.detail;
+      } else if (typeof error.detail === 'object') {
+        // If detail is an object, try to extract a meaningful message
+        errorMessage = error.detail.message || error.detail.msg || JSON.stringify(error.detail);
+      }
+    } else if (error?.message) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = `API Error: ${response.status}`;
+    }
+    throw new Error(errorMessage);
   }
 
   if (response.status === 204) {

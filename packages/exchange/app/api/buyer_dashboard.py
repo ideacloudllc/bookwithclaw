@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/buyers", tags=["buyer-dashboard-api"])
 class BuyerRegisterRequest(BaseModel):
     email: str
     password: str
-    first_name: str
+    name: str
 
 
 class BuyerLoginRequest(BaseModel):
@@ -46,35 +46,56 @@ async def register_buyer(
     session: AsyncSession = Depends(get_db)
 ):
     """Register a new buyer."""
-    # Check if email already exists
-    existing = await session.execute(
-        select(Agent).where(Agent.email == request.email)
-    )
-    if existing.scalars().first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Create new buyer agent
-    buyer_id = f"buyer_{uuid4().hex[:8]}"
-    buyer = Agent(
-        agent_id=buyer_id,
-        email=request.email,
-        password_hash=hash_password(request.password),
-        hotel_name=request.first_name,  # Reuse field for buyer name
-        public_key=f"key_{uuid4().hex[:16]}",
-        role=AgentRole.BUYER
-    )
-    
-    session.add(buyer)
-    await session.commit()
-    
-    token = create_seller_token(buyer_id, request.email)
-    
-    return {
-        "status": "registered",
-        "buyer_id": buyer_id,
-        "email": request.email,
-        "token": token
-    }
+    try:
+        # Check if email already exists
+        existing = await session.execute(
+            select(Agent).where(Agent.email == request.email)
+        )
+        if existing.scalars().first():
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Validate input
+        if not request.email or not request.password or not request.name:
+            raise HTTPException(status_code=400, detail="Email, password, and name are required")
+        
+        if len(request.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        # Create new buyer agent
+        buyer_id = f"buyer_{uuid4().hex[:8]}"
+        buyer = Agent(
+            agent_id=buyer_id,
+            email=request.email,
+            password_hash=hash_password(request.password),
+            hotel_name=request.name,  # Reuse field for buyer name
+            public_key=f"key_{uuid4().hex[:16]}",
+            role=AgentRole.BUYER
+        )
+        
+        session.add(buyer)
+        await session.commit()
+        
+        token = create_seller_token(buyer_id, request.email)
+        
+        return {
+            "status": "registered",
+            "buyer_id": buyer_id,
+            "email": request.email,
+            "access_token": token,
+            "token": token
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        # Return a user-friendly error message
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="Email is already in use")
+        elif "constraint" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="Invalid input - please check your data")
+        else:
+            raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
 
 
 @router.post("/auth/login")

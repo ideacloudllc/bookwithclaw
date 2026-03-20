@@ -67,38 +67,58 @@ async def register_seller(
     session: AsyncSession = Depends(get_db)
 ):
     """Register a new seller (hotel)."""
-    # Check if email already exists
-    existing = await session.execute(
-        select(Agent).where(Agent.email == request.email)
-    )
-    if existing.scalars().first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Create new seller agent
-    seller_id = f"seller_{uuid4().hex[:8]}"
-    seller = Agent(
-        agent_id=seller_id,
-        email=request.email,
-        password_hash=hash_password(request.password),
-        hotel_name=request.hotel_name,
-        public_key=f"key_{uuid4().hex[:16]}",  # Placeholder for now
-        role=AgentRole.SELLER
-    )
-    
-    session.add(seller)
-    await session.commit()
-    
-    # Generate auth token
-    token = create_seller_token(seller_id, request.email)
-    
-    return {
-        "status": "registered",
-        "seller_id": seller_id,
-        "email": request.email,
-        "hotel_name": request.hotel_name,
-        "access_token": token,
-        "next_step": "Complete your profile"
-    }
+    try:
+        # Check if email already exists
+        existing = await session.execute(
+            select(Agent).where(Agent.email == request.email)
+        )
+        if existing.scalars().first():
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Validate input
+        if not request.email or not request.password or not request.hotel_name:
+            raise HTTPException(status_code=400, detail="Email, password, and hotel name are required")
+        
+        if len(request.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+        # Create new seller agent
+        seller_id = f"seller_{uuid4().hex[:8]}"
+        seller = Agent(
+            agent_id=seller_id,
+            email=request.email,
+            password_hash=hash_password(request.password),
+            hotel_name=request.hotel_name,
+            public_key=f"key_{uuid4().hex[:16]}",  # Placeholder for now
+            role=AgentRole.SELLER
+        )
+        
+        session.add(seller)
+        await session.commit()
+        
+        # Generate auth token
+        token = create_seller_token(seller_id, request.email)
+        
+        return {
+            "status": "registered",
+            "seller_id": seller_id,
+            "email": request.email,
+            "hotel_name": request.hotel_name,
+            "access_token": token,
+            "next_step": "Complete your profile"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        # Return a user-friendly error message instead of technical details
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="Email is already in use")
+        elif "constraint" in error_msg.lower():
+            raise HTTPException(status_code=400, detail="Invalid input - please check your data")
+        else:
+            raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
 
 
 @router.post("/auth/login")
